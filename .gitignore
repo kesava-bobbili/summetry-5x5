@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Credentials & Secrets (CRITICAL)
+*.json
+!magic_boards2.json
+!daily_queue.json
+!feedback.json
+
+# Local virtual environment
+venv/
+.venv/
+env/
+.env
+.env.local

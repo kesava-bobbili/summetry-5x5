@@ -1,0 +1,210 @@
+{
+  "f184ac78-9abc-4c8d-93fb-7da94d1d0a3a": [
+    {
+      "author": "System Test",
+      "timestamp": "2026-06-21 19:50",
+      "text": "Passed validation checks! This board has exactly 1 unique solution.",
+      "rating": "Just Right"
+    }
+  ],
+  "c5d99331-8931-4e61-96b9-c6c102caed56": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:46",
+      "text": "This one felt challenging from the start because there weren\u2019t many obvious moves available. I had to spend some time figuring out the common sum and looking for connections between different rows and columns before I could make real progress. A few deductions unlocked the board, but getting to those deductions took some careful thinking. It felt rewarding to solve, but definitely required more effort and patience than a typical easy puzzle.",
+      "rating": "Hard"
+    }
+  ],
+  "044f661c-8c77-be7f-784e-6bf7305d49f6": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:38",
+      "text": "I was able to get started pretty quickly on this one since there were enough clues to work with from the beginning. The common sum became clear after a few deductions, and the remaining cells followed naturally from the row and column constraints. The puzzle felt smooth to solve, with a steady flow of progress and no point where I felt completely stuck. Overall, it was a relaxing and enjoyable puzzle that didn\u2019t require too much effort to finish.",
+      "rating": "Easy"
+    }
+  ],
+  "11c9e526-606b-b22e-8aa9-1c04e6356ff5": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:44",
+      "text": "This one definitely took more effort to solve. At the beginning there were a lot of empty cells, so it wasn\u2019t obvious where the common sum would come from. I had to work through a few deductions before things started clicking into place. Once I found a couple of important values, the board became much easier to read, but getting to that point required some patience. Overall, it felt challenging and rewarding to solve.",
+      "rating": "Hard"
+    }
+  ],
+  "8c73d5b9-320f-385d-f7cb-fd298e1e84d4": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:38",
+      "text": "It took a little time to figure out the common sum, but once I found a couple of key values, the rest of the puzzle started falling into place. The clues felt balanced, and I was able to make steady progress without getting completely stuck. There were a few moments where I had to think carefully about the possible values, but the solution felt logical throughout and satisfying to complete.",
+      "rating": "Medium"
+    }
+  ],
+  "3e3b9c3f-b3bc-c778-1798-ae4d04a94c8b": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:39",
+      "text": "I was able to make progress fairly quickly after finding the common sum. A few cells were straightforward to fill, but there were also a couple of spots where I had to stop and think before deciding on the correct value. The puzzle felt balanced overall, with a nice mix of easy deductions and small challenges. It stayed engaging throughout and the solution came together in a satisfying way.",
+      "rating": "Medium"
+    }
+  ],
+  "f5f52211-7a6b-c61e-02fe-bad862d37bd3": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:40",
+      "text": "I was able to find the common sum fairly quickly and get started without much confusion. The clues were placed in a way that gave a clear direction, and most of the missing cells could be filled through simple deductions. The puzzle felt smooth and intuitive to solve, with steady progress throughout and very little time spent getting stuck. Overall, it was an enjoyable and approachable puzzle.",
+      "rating": "Easy"
+    }
+  ],
+  "db9ac19d-f303-d965-157b-3c9fd397818b": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:41",
+      "text": "This one was pretty smooth to solve. I could get an idea of the common sum quite early, and after that most of the missing cells started falling into place. I didn\u2019t really get stuck anywhere, and each step gave enough information to figure out the next one. It felt straightforward and satisfying without being too easy or too challenging.",
+      "rating": "Easy"
+    }
+  ],
+  "5f0f7959-55ac-b20a-a177-a2591c8d4732": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:42",
+      "text": "This one was nice to solve. I could make some progress right from the start, but there were a few places where I had to pause and think a bit before the next value became clear. The clues felt well spread out, so I never felt completely stuck, and once a couple of cells were filled, the rest started connecting together. It felt balanced and satisfying without being too easy.",
+      "rating": "Medium"
+    }
+  ],
+  "b96cd62f-cff9-8e62-838a-a661faf101f3": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:42",
+      "text": "This one took a bit more thinking than it first looked. I could make some progress early on, but there were a few points where I had to stop and work through the row and column constraints carefully before the next value became clear. Once a couple of key cells were filled, the rest started connecting nicely. It felt balanced overall and kept me engaged throughout the solve.",
+      "rating": "Medium"
+    }
+  ],
+  "e461320b-83b8-488c-5c1d-763884b8cdc0": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:43",
+      "text": "This one took me a little while to get going because the common sum wasn\u2019t obvious straight away. After filling a few key cells, the rest of the board started making more sense and the deductions became easier to follow. There were a couple of points where I had to think carefully before committing to a value, but it never felt unfair. Overall, it felt engaging and satisfying to solve.",
+      "rating": "Medium"
+    }
+  ],
+  "6d1f4c69-4101-0606-d09e-2d6bfea02235": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:43",
+      "text": "This one felt a bit tricky at the start because there were quite a few empty cells, so it wasn\u2019t immediately obvious where to begin. After finding the common sum and filling a couple of key values, the board started making more sense and the rest of the deductions followed naturally. I had to think through a few steps carefully, but it never felt like random guessing. Overall, it was a nice balanced puzzle that kept me engaged until the end.",
+      "rating": "Medium"
+    }
+  ],
+  "6d9ee40a-a8a3-f53d-7de0-3e40a419190e": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:44",
+      "text": "This one felt pretty smooth overall. I could make progress from the start, and after filling a few cells the pattern became easier to follow. There were one or two places where I had to think a bit more carefully, but I never felt stuck for long. The clues gave enough direction to keep the puzzle moving, and the solution came together in a satisfying way.",
+      "rating": "Medium"
+    }
+  ],
+  "ce71e55f-b2b6-592a-ee09-0970a2cd0b5b": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:52",
+      "text": "This one felt fairly balanced. I could spot a few useful deductions early on, which helped me get started without too much confusion. There were still a couple of moments where I had to slow down and think about how the rows and columns connected, but the puzzle always felt manageable. It wasn\u2019t an instant solve, but it also didn\u2019t feel overly difficult. Overall, it was enjoyable and had a nice flow from start to finish.",
+      "rating": "Hard"
+    }
+  ],
+  "61bd4677-e018-baac-7ce4-2f94922d0c1a": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:54",
+      "text": "At first I thought this one would be easy because there were quite a few clues already visible, but it still took some thinking to figure out the right path. I was able to make steady progress without getting stuck, and each deduction felt fair. The puzzle had a nice balance between being approachable and still making me work for the solution.",
+      "rating": "Hard"
+    }
+  ],
+  "5986be11-b49e-77d8-bba9-284ef37eb6dd": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 08:56",
+      "text": "This one felt pretty straightforward. The row with 9 4 1 1 1 and the row with 1 1 6 4 4 gave good clues early, so I could start filling cells without much trial and error. I didn\u2019t get stuck anywhere and the solution came together naturally once a few numbers were placed. Nice smooth solve.",
+      "rating": "Easy"
+    }
+  ],
+  "9446574b-0355-d74f-29fc-b7bb99fcc93b": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:04",
+      "text": "At first I looked at the last row and noticed the easiest possible common sum looked like 17. Based on that, I placed 4 in the missing cell of the 4th row, which made both the 4th row and 5th column add up to 17. After that, the remaining cells started falling into place pretty quickly. Once that first connection clicked, the puzzle felt quite easy to finish.",
+      "rating": "Easy"
+    }
+  ],
+  "e6a8b51b-0c08-1a1a-c4b1-ba2af8c1b352": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:10",
+      "text": "I first looked at the 4th column because it already had a lot of numbers filled. From there it was pretty easy to figure out the common sum and get a couple of missing values. Once those were placed, the remaining rows and columns matched up quickly. Didn\u2019t need much trial and error for this one.",
+      "rating": "Easy"
+    }
+  ],
+  "e4a22bda-6425-d8a7-3d63-1a2e6ad753d1": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:11",
+      "text": "I started with the rows and columns that already had 4 numbers filled. Once I got the common sum from one of them, a few missing cells became obvious. After that it was mostly filling values that matched both the row and column totals. This one felt pretty straightforward and didn\u2019t take much time.",
+      "rating": "Easy"
+    }
+  ],
+  "70fbe073-2547-93b1-dfe5-50b03f32cf00": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:13",
+      "text": "This one took a bit more thinking. I first checked the rows and columns with the most numbers filled, but the common sum wasn\u2019t obvious immediately. Had to use a couple of row-column connections before things started matching up. Once I got a few key cells, the rest became much easier, but it definitely felt more involved than the easy boards.",
+      "rating": "Medium"
+    }
+  ],
+  "153b0dfb-a99c-e453-2995-f6dc3c959579": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:13",
+      "text": "I first noticed the 3rd column was almost complete, so I used that to get an idea of the common sum. After that, a few cells could be filled directly, but I still had to jump between rows and columns to confirm things. Not too hard, but it took a little more thinking than the easy ones before everything started fitting together.",
+      "rating": "Medium"
+    }
+  ],
+  "227cfd60-b913-6457-1c42-20360a34185a": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:14",
+      "text": "This one was a bit tricky at the start because there weren\u2019t many obvious clues. I first looked at the 3rd and 5th columns since they had the most numbers filled. After figuring out the common sum, a few cells became clear, but I still had to check multiple rows and columns before everything matched. Took a little more thinking than the easier boards.",
+      "rating": "Medium"
+    }
+  ],
+  "490228c8-fbfc-b14e-805f-f59f4bab2766": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:19",
+      "text": "I first checked the 1st column since it already had three numbers filled and looked like a good starting point. After getting an idea of the sum, I could fill a couple of cells, but then I had to keep switching between rows and columns to verify everything. Not very hard, but it wasn\u2019t one of those boards where the answer immediately jumps out either.",
+      "rating": "Hard"
+    }
+  ],
+  "bf94408c-99cb-447e-21f4-ca22afcf304f": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:21",
+      "text": "This one was a bit harder. I first looked for a row or column with the most revealed numbers to estimate the common target sum. After finding a likely sum, I used it to fill a few missing cells and then cross-checked them with their corresponding columns. Once those values matched both row and column requirements, the remaining cells became easier to deduce step by step.",
+      "rating": "Hard"
+    }
+  ],
+  "e44d0b4f-f092-8790-a596-c2fd535a30a2": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:22",
+      "text": "This one was quite hard. I first looked for a strong clue instead of trying to solve every row at once. The last column already had three 4s, which suggested that the common sum would likely be around the low 20s. After estimating the target sum, I used the rows containing 8, 3, and 2 to narrow down the missing values. Once a couple of cells were fixed, the remaining rows and columns became much easier to complete through cross-checking.",
+      "rating": "Hard"
+    }
+  ],
+  "1b610572-6898-8daa-3b5d-c0ec147b4fbd": [
+    {
+      "author": "k",
+      "timestamp": "2026-06-22 09:23",
+      "text": "This puzzle was tricky because there wasn\u2019t an obvious row or column to start with. I first looked for the strongest clue and noticed that the first row already had 7, 7, 3, and 1, so only one value was missing. That helped me estimate the common target sum. After finding that missing value, I used the same sum to solve the connected columns and gradually filled the remaining cells. Once a few key numbers were fixed, the rest of the board became much easier to complete.",
+      "rating": "Hard"
+    }
+  ]
+}
