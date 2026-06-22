@@ -79,43 +79,26 @@ def save_note(board_id, author, text, rating="Note"):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     if not NOTES_ENABLED:
         notes = load_notes()
-        notes[board_id] = [{
+        if board_id not in notes or not isinstance(notes[board_id], list):
+            notes[board_id] = []
+        notes[board_id].append({
             "author":    author,
             "timestamp": timestamp,
             "text":      text.strip(),
             "rating":    rating,
-        }]
+        })
         with open(LOCAL_FEEDBACK_FILE, "w") as f:
             json.dump(notes, f, indent=2)
         return
 
     ws = get_sheet()
-    try:
-        cell = ws.find(board_id)
-        if cell:
-            ws.update(f"A{cell.row}:E{cell.row}", [[
-                board_id,
-                author,
-                timestamp,
-                text.strip(),
-                rating
-            ]])
-        else:
-            ws.append_row([
-                board_id,
-                author,
-                timestamp,
-                text.strip(),
-                rating
-            ])
-    except Exception:
-        ws.append_row([
-            board_id,
-            author,
-            timestamp,
-            text.strip(),
-            rating
-        ])
+    ws.append_row([
+        board_id,
+        author,
+        timestamp,
+        text.strip(),
+        rating
+    ])
 
 # ============================
 # Session state
