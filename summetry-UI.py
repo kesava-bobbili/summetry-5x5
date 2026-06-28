@@ -108,7 +108,23 @@ def init_board(board):
     st.session_state.solution    = board["solution"]
     st.session_state.difficulty  = board["difficulty"]
     st.session_state.board_id    = board["board_id"]
-    st.session_state.case_steps  = board.get("case_steps", 0)
+    
+    # Get or calculate case_steps dynamically if missing (e.g. from daily_queue.json)
+    case_steps = board.get("case_steps")
+    if case_steps is None:
+        try:
+            from generate_boards import logical_solve
+            magic_sum = board.get("magic_sum")
+            if magic_sum is None and board.get("solution"):
+                magic_sum = sum(board["solution"][0])
+            if magic_sum is not None:
+                _, case_steps = logical_solve(board["puzzle"], magic_sum)
+            else:
+                case_steps = 0
+        except Exception:
+            case_steps = 0
+            
+    st.session_state.case_steps  = case_steps
     size = len(board["puzzle"])
     st.session_state.size        = size
     st.session_state.cell_values = [[None] * size for _ in range(size)]
