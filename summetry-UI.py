@@ -502,6 +502,50 @@ if st.button("Submit Feedback", type="primary", use_container_width=True):
         st.warning("Please write a comment or observation before submitting.")
 
 # ============================
+# Custom Board Solver
+# ============================
+st.divider()
+with st.expander("🛠️ Custom Board Solver & Diagnostic"):
+    st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
+    solver_grid = []
+    for r in range(5):
+        cols = st.columns(5)
+        row_vals = []
+        for c in range(5):
+            with cols[c]:
+                val = st.text_input(
+                    "",
+                    value="",
+                    key=f"solver_cell_{r}_{c}",
+                    max_chars=1,
+                    label_visibility="collapsed"
+                )
+                val = val.strip()
+                if val in [str(i) for i in range(1, 10)]:
+                    row_vals.append(int(val))
+                else:
+                    row_vals.append(None)
+        solver_grid.append(row_vals)
+
+    if st.button("Solve Board", type="primary", key="run_custom_solver", use_container_width=True):
+        from generate_boards import solve_puzzle_cp_sat
+        sols = solve_puzzle_cp_sat(solver_grid, limit=5)
+        if not sols:
+            st.error("❌ No valid solution exists for this board configuration!")
+        else:
+            st.success(f"🎉 Found {len(sols)} valid completion(s)!")
+            for idx, sol in enumerate(sols):
+                st.markdown(f"**Solution #{idx+1}** (Magic Sum = {sum(sol[0])}):")
+                html_grid = "<div style='display:grid; grid-template-columns: repeat(5, 45px); gap: 4px; margin-bottom: 12px;'>"
+                for r_idx in range(5):
+                    for c_idx in range(5):
+                        is_input = solver_grid[r_idx][c_idx] is not None
+                        bg = "#1e293b" if is_input else "#0f766e"
+                        html_grid += f"<div style='width:45px; height:45px; display:flex; align-items:center; justify-content:center; background:{bg}; color:white; font-weight:bold; border-radius:6px; font-size:18px;'>{sol[r_idx][c_idx]}</div>"
+                html_grid += "</div>"
+                st.markdown(html_grid, unsafe_allow_html=True)
+
+# ============================
 # Keyboard Listener (Parent DOM Event Interceptor)
 # ============================
 import streamlit.components.v1 as components
