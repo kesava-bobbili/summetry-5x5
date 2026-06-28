@@ -699,7 +699,8 @@ components.html(
                     // 2. Auto-overwrite and advance focus on Digit Key (1-9)
                     if (key >= '1' && key <= '9') {{
                         e.preventDefault();
-                        e.target.value = key;
+                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeSetter.call(e.target, key);
                         e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
                         e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
                         
@@ -716,7 +717,8 @@ components.html(
                     // 3. Backspace - clear and move back
                     if (key === 'Backspace' || key === 'Delete' || key === '0' || key.toLowerCase() === 'x') {{
                         e.preventDefault();
-                        e.target.value = '';
+                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeSetter.call(e.target, '');
                         e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
                         e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
                         
