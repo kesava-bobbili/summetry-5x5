@@ -696,39 +696,23 @@ components.html(
                         return;
                     }}
                     
-                    // 2. Auto-overwrite and advance focus on Digit Key (1-9)
+                    // 2. Auto-overwrite and keep focus on Digit Key (1-9)
                     if (key >= '1' && key <= '9') {{
                         e.preventDefault();
                         const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                         nativeSetter.call(e.target, key);
                         e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
                         e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        
-                        if (idx + 1 < 25) {{
-                            const nextInput = inputs[idx + 1];
-                            if (nextInput) {{
-                                nextInput.focus();
-                                nextInput.select();
-                            }}
-                        }}
                         return;
                     }}
                     
-                    // 3. Backspace - clear and move back
+                    // 3. Backspace - clear and keep focus
                     if (key === 'Backspace' || key === 'Delete' || key === '0' || key.toLowerCase() === 'x') {{
                         e.preventDefault();
                         const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                         nativeSetter.call(e.target, '');
                         e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
                         e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        
-                        if (key === 'Backspace' && idx - 1 >= 0) {{
-                            const prevInput = inputs[idx - 1];
-                            if (prevInput) {{
-                                prevInput.focus();
-                                prevInput.select();
-                            }}
-                        }}
                         return;
                     }}
                 }}
