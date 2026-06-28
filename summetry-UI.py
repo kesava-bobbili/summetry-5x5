@@ -667,12 +667,90 @@ components.html(
         
         // Keydown listener
         parentDoc.addEventListener('keydown', function(e) {{
+            let key = e.key;
+            
+            // Check if user is typing in the Custom Solver grid inputs
+            if (e.target && e.target.tagName === 'INPUT') {{
+                const inputs = Array.from(parentDoc.querySelectorAll('[class*="st-key-solver_cell_"] input'));
+                const idx = inputs.indexOf(e.target);
+                if (idx !== -1) {{
+                    let r = Math.floor(idx / 5);
+                    let c = idx % 5;
+                    
+                    // 1. Grid cell navigation with Arrow Keys
+                    if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
+                        e.preventDefault();
+                        let nr = r, nc = c;
+                        if (key === 'ArrowUp') nr--;
+                        else if (key === 'ArrowDown') nr++;
+                        else if (key === 'ArrowLeft') nc--;
+                        else if (key === 'ArrowRight') nc++;
+                        
+                        if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) {{
+                            const nextInput = inputs[nr * 5 + nc];
+                            if (nextInput) {{
+                                nextInput.focus();
+                                nextInput.select();
+                            }}
+                        }}
+                        return;
+                    }}
+                    
+                    // 2. Auto-overwrite and advance focus on Digit Key (1-9)
+                    if (key >= '1' && key <= '9') {{
+                        e.preventDefault();
+                        e.target.value = key;
+                        e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        
+                        if (idx + 1 < 25) {{
+                            const nextInput = inputs[idx + 1];
+                            if (nextInput) {{
+                                nextInput.focus();
+                                nextInput.select();
+                            }}
+                        }}
+                        return;
+                    }}
+                    
+                    // 3. Backspace - clear and move back
+                    if (key === 'Backspace' || key === 'Delete' || key === '0' || key.toLowerCase() === 'x') {{
+                        e.preventDefault();
+                        e.target.value = '';
+                        e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        
+                        if (key === 'Backspace' && idx - 1 >= 0) {{
+                            const prevInput = inputs[idx - 1];
+                            if (prevInput) {{
+                                prevInput.focus();
+                                prevInput.select();
+                            }}
+                        }}
+                        return;
+                    }}
+                }}
+            }}
+            
+            // Standard inputs check (notes, name prompt etc.)
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {{
                 return;
             }}
-            let key = e.key;
             
-            // Grid cell navigation with Arrow Keys
+            // Normal board keyboard controls
+            if (key >= '1' && key <= '9') {{
+                const btn = parentDoc.querySelector(`.st-key-pad${{key}} button`);
+                if (btn) {{
+                    btn.click();
+                }}
+            }} else if (key === 'Backspace' || key === 'Delete' || key.toLowerCase() === 'x' || key === '0') {{
+                const btn = parentDoc.querySelector('.st-key-pad_clear button');
+                if (btn) {{
+                    btn.click();
+                }}
+            }}
+            
+            // Normal board cell navigation with Arrow Keys
             if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
                 e.preventDefault();
                 const stateEl = parentDoc.getElementById('summetry-state');
@@ -712,18 +790,6 @@ components.html(
                     }}
                 }}
                 return;
-            }}
-            
-            if (key >= '1' && key <= '9') {{
-                const btn = parentDoc.querySelector(`.st-key-pad${{key}} button`);
-                if (btn) {{
-                    btn.click();
-                }}
-            }} else if (key === 'Backspace' || key === 'Delete' || key.toLowerCase() === 'x' || key === '0') {{
-                const btn = parentDoc.querySelector('.st-key-pad_clear button');
-                if (btn) {{
-                    btn.click();
-                }}
             }}
         }});
     }}
