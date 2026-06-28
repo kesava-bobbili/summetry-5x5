@@ -562,7 +562,20 @@ with st.expander("🛠️ Custom Board Solver & Diagnostic"):
         num_constraints = len(model.Proto().constraints)
         num_variables = 26 # 25 cells + M
         
-        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms
+        # run logical solve to measure difficulty if a valid completion exists
+        case_steps = -1
+        if cb.solutions():
+            from generate_boards import logical_solve
+            first_sol = cb.solutions()[0]
+            magic_sum = sum(first_sol[0])
+            try:
+                _, case_steps = logical_solve(puzzle, magic_sum)
+            except Exception:
+                case_steps = -1
+        else:
+            case_steps = -1
+            
+        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps
 
     solver_grid = []
     for r in range(5):
@@ -585,14 +598,31 @@ with st.expander("🛠️ Custom Board Solver & Diagnostic"):
         solver_grid.append(row_vals)
 
     if st.button("Solve Board", type="primary", key="run_custom_solver", use_container_width=True):
-        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms = solve_custom_board_with_stats(solver_grid)
+        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps = solve_custom_board_with_stats(solver_grid)
         if not sols:
             st.error(f"❌ No valid solution exists for this board configuration! (Checked {num_constraints} constraints in {elapsed_ms:.2f} ms)")
         else:
             st.success(f"🎉 Found {len(sols)} valid completion(s) in {elapsed_ms:.2f} ms!")
             
+            # Display difficulty parameters if available
+            if case_steps != -1:
+                if case_steps == 0:
+                    diff_rating = "EASY"
+                    diff_color = "#065f46"
+                elif case_steps in [1, 2, 3, 4]:
+                    diff_rating = "MEDIUM"
+                    diff_color = "#78350f"
+                else:
+                    diff_rating = "HARD"
+                    diff_color = "#7f1d1d"
+                
+                st.markdown(
+                    f"🧩 **Complexity:** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;'>{diff_rating}</span> (Requires <b>{case_steps}</b> contradiction step(s))",
+                    unsafe_allow_html=True
+                )
+            
             st.markdown(
-                f"<div style='font-size:12px; color:#94a3b8; background:#1e293b; padding:8px 12px; border-radius:6px; margin-bottom:12px; line-height:1.5;'>"
+                f"<div style='font-size:12px; color:#94a3b8; background:#1e293b; padding:8px 12px; border-radius:6px; margin-top:8px; margin-bottom:12px; line-height:1.5;'>"
                 f"🧠 **Solver Statistics:**<br>"
                 f"• Variables Evaluated: <b>{num_variables}</b> (25 grid cells + magic sum)<br>"
                 f"• Constraints Enforced: <b>{num_constraints}</b> magic sum equations<br>"
