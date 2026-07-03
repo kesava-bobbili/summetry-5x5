@@ -397,15 +397,15 @@ def render_keyboard_listener():
     )
 
 def render_custom_solver(standalone=False):
-    if standalone:
-        st.subheader("🛠️ Standalone Solver & Diagnostics")
-        st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
-        st.link_button("🎮 Back to Main Game", "/", use_container_width=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-    else:
-        st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
+    if not standalone:
+        st.write("Click below to open the Standalone Custom Board Solver & Diagnostics tool in a new tab:")
         st.link_button("↗️ Open Standalone Solver in New Tab", "/?page=solver", use_container_width=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        return
+
+    st.subheader("🛠️ Standalone Solver & Diagnostics")
+    st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
+    st.link_button("🎮 Back to Main Game", "/", use_container_width=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # 1. Load by ID section
     st.subheader("🔍 Load Board by ID")
