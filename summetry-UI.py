@@ -394,6 +394,61 @@ def render_keyboard_listener():
         width=0
     )
 
+def simulate_subtraction_solve(puzzle, solution, target_sum):
+    grid = [row[:] for row in puzzle]
+    stuck_count = 0
+    while True:
+        empty_cells = [(r, c) for r in range(5) for c in range(5) if grid[r][c] is None]
+        if not empty_cells:
+            break
+        found_line = None
+        for r in range(5):
+            if sum(1 for c in range(5) if grid[r][c] is not None) == 4:
+                found_line = (r, next(i for i in range(5) if grid[r][i] is None))
+                break
+        if not found_line:
+            for c in range(5):
+                if sum(1 for r in range(5) if grid[r][c] is not None) == 4:
+                    found_line = (next(i for i in range(5) if grid[i][c] is None), c)
+                    break
+        if not found_line:
+            if sum(1 for i in range(5) if grid[i][i] is not None) == 4:
+                found_line = (next(j for j in range(5) if grid[j][j] is None), next(j for j in range(5) if grid[j][j] is None))
+        if not found_line:
+            if sum(1 for i in range(5) if grid[i][4-i] is not None) == 4:
+                found_line = (next(j for j in range(5) if grid[j][4-j] is None), 4 - next(j for j in range(5) if grid[j][4-j] is None))
+                
+        if found_line:
+            r, c = found_line
+            grid[r][c] = solution[r][c]
+        else:
+            stuck_count += 1
+            r, c = empty_cells[0]
+            grid[r][c] = solution[r][c]
+    return stuck_count
+
+def calculate_difficulty_human(puzzle, solution, target_sum):
+    stuck_count = simulate_subtraction_solve(puzzle, solution, target_sum)
+    
+    # 2. Count initial 4-clue lines
+    row_clues = [sum(1 for val in row if val is not None) for row in puzzle]
+    col_clues = [sum(1 for r in range(5) if puzzle[r][c] is not None) for c in range(5)]
+    diag1 = sum(1 for i in range(5) if puzzle[i][i] is not None)
+    diag2 = sum(1 for i in range(5) if puzzle[i][4-i] is not None)
+    all_lines = row_clues + col_clues + [diag1, diag2]
+    initial_4_clue_lines = sum(1 for count in all_lines if count == 4)
+    
+    # 3. Count diagonal clues
+    diag_clues = sum(1 for i in range(5) if puzzle[i][i] is not None) + sum(1 for i in range(5) if puzzle[i][4-i] is not None)
+
+    # 4. Cognitive load score (linear model derived from training accuracy on magic_boards_300.json)
+    score = -2 * stuck_count + 2 * initial_4_clue_lines - 1 * diag_clues - 0.1 * target_sum
+    
+    if score >= -6.0:
+        return "MEDIUM", score
+    else:
+        return "EASY", score
+
 def render_custom_solver(standalone=False):
     if not standalone:
         st.write("Click below to open the Standalone Custom Board Solver & Diagnostics tool in a new tab:")
@@ -476,20 +531,19 @@ def render_custom_solver(standalone=False):
         num_constraints = len(model.Proto().constraints)
         num_variables = 26
         
-        # run logical solve to measure difficulty if a valid completion exists
-        case_steps = -1
+        # run logical solve and human cognitive solve to measure difficulty if a valid completion exists
+        human_diff = "EASY"
         if cb.solutions():
-            from generate_boards import logical_solve
             first_sol = cb.solutions()[0]
             magic_sum = sum(first_sol[0])
             try:
-                _, case_steps = logical_solve(puzzle, magic_sum)
+                human_diff, _ = calculate_difficulty_human(puzzle, first_sol, magic_sum)
             except Exception:
-                case_steps = -1
+                human_diff = "EASY"
         else:
-            case_steps = -1
+            human_diff = "EASY"
             
-        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps
+        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms, human_diff
 
     solver_grid = []
     for r in range(5):
@@ -512,28 +566,18 @@ def render_custom_solver(standalone=False):
         solver_grid.append(row_vals)
 
     if st.button("Solve Board", type="primary", key="run_custom_solver_btn_standalone" if standalone else "run_custom_solver_btn_expander", use_container_width=True):
-        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps = solve_custom_board_with_stats(solver_grid)
+        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms, human_diff = solve_custom_board_with_stats(solver_grid)
         if not sols:
             st.error(f"❌ No valid solution exists for this board configuration! (Checked {num_constraints} constraints in {elapsed_ms:.2f} ms)")
         else:
             st.success(f"🎉 Found {len(sols)} valid completion(s) in {elapsed_ms:.2f} ms!")
             
             # Display difficulty parameters if available
-            if case_steps != -1:
-                if case_steps == 0:
-                    diff_rating = "EASY"
-                    diff_color = "#065f46"
-                elif case_steps in [1, 2, 3, 4]:
-                    diff_rating = "MEDIUM"
-                    diff_color = "#78350f"
-                else:
-                    diff_rating = "HARD"
-                    diff_color = "#7f1d1d"
-                
-                st.markdown(
-                    f"🧩 **Complexity:** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;'>{diff_rating}</span> (Requires <b>{case_steps}</b> contradiction step(s))",
-                    unsafe_allow_html=True
-                )
+            diff_color = "#065f46" if human_diff == "EASY" else "#78350f"
+            st.markdown(
+                f"🧩 **Complexity (Human Rating):** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;'>{human_diff}</span>",
+                unsafe_allow_html=True
+            )
             
             st.markdown(
                 f"<div style='font-size:12px; color:#94a3b8; background:#1e293b; padding:8px 12px; border-radius:6px; margin-top:8px; margin-bottom:12px; line-height:1.5;'>"
@@ -649,7 +693,17 @@ st.title("Summetry")
 
 diff = st.session_state.difficulty
 diff_class = f"diff-{diff.lower()}"
-case_steps = st.session_state.get("case_steps", 0)
+# Compute Human Cognitive difficulty metrics for the main page board
+try:
+    human_diff, cognitive_score = calculate_difficulty_human(
+        st.session_state.puzzle, 
+        st.session_state.solution, 
+        sum(st.session_state.solution[0])
+    )
+except Exception:
+    human_diff, cognitive_score = "EASY", -10.0
+
+diff_class = f"diff-{diff.lower()}"
 
 st.markdown(
     f"<div style='display: flex; gap: 8px; align-items: center; margin-bottom: 8px;'>"
@@ -660,9 +714,10 @@ st.markdown(
 )
 
 # Display solver and difficulty stats in a clean caption style
+diff_color = "#065f46" if human_diff == "EASY" else "#78350f"
 st.markdown(
     f"<div style='font-size:12px; color:#64748b; margin-bottom:12px; line-height: 1.4;'>"
-    f"🧩 **Complexity:** Requires <b>{case_steps}</b> contradiction/elimination step(s) to prove unique solution.<br>"
+    f"🧩 **Complexity (Human Rating):** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 6px; font-weight:700;'>{human_diff}</span> (Score: {cognitive_score:.1f})<br>"
     f"⚡ **Verification:** CP-SAT solver verified 12 sum equations for 25 cell variables in &lt;1 ms."
     f"</div>",
     unsafe_allow_html=True,
