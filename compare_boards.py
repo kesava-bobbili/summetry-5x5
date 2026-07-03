@@ -181,10 +181,10 @@ def main():
 
     report_lines.append("## ❌ Mismatch Details")
     if mismatch_details:
-        report_lines.append("| Board ID | Original Difficulty | Calculated Difficulty | Case Steps |")
-        report_lines.append("| --- | --- | --- | --- |")
+        report_lines.append("| Board ID | Original Difficulty | Calculated Difficulty |")
+        report_lines.append("| --- | --- | --- |")
         for m in mismatch_details:
-            report_lines.append(f"| `{m['board_id']}` | {m['orig_diff']} | **{m['calc_diff']}** | {m['case_steps']} |")
+            report_lines.append(f"| `{m['board_id']}` | {m['orig_diff']} | **{m['calc_diff']}** |")
     else:
         report_lines.append("*All board difficulties match the solver classifications perfectly! 🎉*")
 
