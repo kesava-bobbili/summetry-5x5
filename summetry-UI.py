@@ -45,7 +45,20 @@ def load_boards():
     by_id = {b["board_id"]: b for b in data}
     return data, by_id
 
+@st.cache_data
+def load_boards_300():
+    try:
+        with open("magic_boards_300.json", "r") as f:
+            data = json.load(f)
+        for b in data:
+            b["blanks"] = sum(row.count(None) for row in b["puzzle"])
+        by_id = {b["board_id"]: b for b in data}
+        return data, by_id
+    except Exception:
+        return [], {}
+
 boards, boards_by_id = load_boards()
+boards_300, boards_300_by_id = load_boards_300()
 
 # ============================
 # Notes helpers
@@ -242,6 +255,317 @@ if not st.session_state.get("author"):
 author = st.session_state.author
 
 # ============================
+# Standalone Solver Page Helpers
+# ============================
+def render_keyboard_listener():
+    import streamlit.components.v1 as components
+    components.html(
+        f"""
+        <script>
+        const parentDoc = window.parent.document;
+        if (!window.parent.__summetry_keyboard_listener_added__) {{
+            window.parent.__summetry_keyboard_listener_added__ = true;
+            
+            // Auto-select text in solver inputs on focus
+            parentDoc.addEventListener('focusin', function(e) {{
+                if (e.target && e.target.tagName === 'INPUT') {{
+                    const container = e.target.closest('[class*="st-key-solver_cell_"]');
+                    if (container) {{
+                        e.target.select();
+                    }}
+                }}
+            }});
+            
+            // Keydown listener
+            parentDoc.addEventListener('keydown', function(e) {{
+                let key = e.key;
+                
+                // Check if user is typing in the Custom Solver grid inputs
+                if (e.target && e.target.tagName === 'INPUT') {{
+                    const inputs = Array.from(parentDoc.querySelectorAll('[class*="st-key-solver_cell_"] input'));
+                    const idx = inputs.indexOf(e.target);
+                    if (idx !== -1) {{
+                        let r = Math.floor(idx / 5);
+                        let c = idx % 5;
+                        
+                        // 1. Grid cell navigation with Arrow Keys
+                        if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
+                            e.preventDefault();
+                            let nr = r, nc = c;
+                            if (key === 'ArrowUp') nr--;
+                            else if (key === 'ArrowDown') nr++;
+                            else if (key === 'ArrowLeft') nc--;
+                            else if (key === 'ArrowRight') nc++;
+                            
+                            if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) {{
+                                const nextInput = inputs[nr * 5 + nc];
+                                if (nextInput) {{
+                                    nextInput.focus();
+                                    nextInput.select();
+                                }}
+                            }}
+                            return;
+                        }}
+                        
+                        // 2. Auto-overwrite and keep focus on Digit Key (1-9)
+                        if (key >= '1' && key <= '9') {{
+                            e.preventDefault();
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                            nativeSetter.call(e.target, key);
+                            e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                            return;
+                        }}
+                        
+                        // 3. Backspace - clear and keep focus
+                        if (key === 'Backspace' || key === 'Delete' || key === '0' || key.toLowerCase() === 'x') {{
+                            e.preventDefault();
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                            nativeSetter.call(e.target, '');
+                            e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                            return;
+                        }}
+                    }}
+                }}
+                
+                // Standard inputs check (notes, name prompt etc.)
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {{
+                    return;
+                }}
+                
+                // Normal board keyboard controls
+                if (key >= '1' && key <= '9') {{
+                    const btn = parentDoc.querySelector(`.st-key-pad${{key}} button`);
+                    if (btn) {{
+                        btn.click();
+                    }}
+                }} else if (key === 'Backspace' || key === 'Delete' || key.toLowerCase() === 'x' || key === '0') {{
+                    const btn = parentDoc.querySelector('.st-key-pad_clear button');
+                    if (btn) {{
+                        btn.click();
+                    }}
+                }}
+                
+                // Normal board cell navigation with Arrow Keys
+                if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
+                    e.preventDefault();
+                    const stateEl = parentDoc.getElementById('summetry-state');
+                    let currentSelRow = stateEl ? parseInt(stateEl.getAttribute('data-selected-row')) : -1;
+                    let currentSelCol = stateEl ? parseInt(stateEl.getAttribute('data-selected-col')) : -1;
+                    
+                    if (currentSelRow === -1) {{
+                        for (let r = 0; r < 5; r++) {{
+                            for (let c = 0; c < 5; c++) {{
+                                const btn = parentDoc.querySelector(`.st-key-c${{r}}${{c}} button`);
+                                if (btn) {{
+                                    btn.click();
+                                    return;
+                                }}
+                            }}
+                        }}
+                        return;
+                    }}
+                    
+                    let new_r = currentSelRow;
+                    let new_c = currentSelCol;
+                    let nextBtn = null;
+                    while (true) {{
+                        if (key === 'ArrowUp') new_r--;
+                        else if (key === 'ArrowDown') new_r++;
+                        else if (key === 'ArrowLeft') new_c--;
+                        else if (key === 'ArrowRight') new_c++;
+                        
+                        if (new_r < 0 || new_r >= 5 || new_c < 0 || new_c >= 5) {{
+                            break;
+                        }}
+                        
+                        nextBtn = parentDoc.querySelector(`.st-key-c${{new_r}}${{new_c}} button`);
+                        if (nextBtn) {{
+                            nextBtn.click();
+                            break;
+                        }}
+                    }}
+                    return;
+                }}
+            }});
+        }}
+        </script>
+        """,
+        height=0,
+        width=0
+    )
+
+def render_custom_solver(standalone=False):
+    if standalone:
+        st.subheader("🛠️ Standalone Solver & Diagnostics")
+        st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
+        st.link_button("🎮 Back to Main Game", "/", use_container_width=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
+        st.link_button("↗️ Open Standalone Solver in New Tab", "/?page=solver", use_container_width=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # 1. Load by ID section
+    st.subheader("🔍 Load Board by ID")
+    col_id_1, col_id_2 = st.columns([3.5, 1])
+    with col_id_1:
+        search_id = st.text_input(
+            "Enter Board ID",
+            key="solver_search_id_standalone" if standalone else "solver_search_id_expander",
+            label_visibility="collapsed",
+            placeholder="Enter Board ID (UUID)..."
+        )
+    with col_id_2:
+        if st.button("Load Clues", key="solver_load_btn_standalone" if standalone else "solver_load_btn_expander", use_container_width=True):
+            if search_id.strip():
+                # Find board by ID in daily boards or 300 boards
+                target_board = boards_by_id.get(search_id.strip())
+                if not target_board:
+                    target_board = boards_300_by_id.get(search_id.strip())
+                if target_board:
+                    puzzle = target_board["puzzle"]
+                    for r in range(5):
+                        for c in range(5):
+                            val = puzzle[r][c]
+                            st.session_state[f"solver_cell_{r}_{c}"] = str(val) if val is not None else ""
+                    st.success(f"✅ Loaded board '{search_id.strip()}' clues!")
+                    st.rerun()
+                else:
+                    st.error("❌ Board ID not found in daily queue or 300-boards database.")
+            else:
+                st.warning("Please enter a Board ID first.")
+
+    st.markdown("---")
+    
+    # 2. Solver core functions
+    def solve_custom_board_with_stats(puzzle):
+        import time
+        from ortools.sat.python import cp_model
+        from generate_boards import SolutionCounter, N
+        
+        start_time = time.time()
+        model = cp_model.CpModel()
+        grid = [[model.NewIntVar(1, 9, f"cell_{r}_{c}") for c in range(N)] for r in range(N)]
+        M = model.NewIntVar(5, 45, "M")
+
+        # Connect clues
+        for r in range(N):
+            for c in range(N):
+                if puzzle[r][c] is not None:
+                    model.Add(grid[r][c] == puzzle[r][c])
+
+        # Sum constraints
+        for r in range(N):
+            model.Add(sum(grid[r][c] for c in range(N)) == M)
+        for c in range(N):
+            model.Add(sum(grid[r][c] for r in range(N)) == M)
+        model.Add(sum(grid[i][i] for i in range(N)) == M)
+        model.Add(sum(grid[i][N - 1 - i] for i in range(N)) == M)
+
+        solver = cp_model.CpSolver()
+        solver.parameters.enumerate_all_solutions = True
+        solver.parameters.num_search_workers = 1
+        
+        cb = SolutionCounter(grid, limit=5)
+        solver.Solve(model, cb)
+        
+        elapsed_ms = (time.time() - start_time) * 1000
+        
+        branches = solver.NumBranches()
+        conflicts = solver.NumConflicts()
+        num_constraints = len(model.Proto().constraints)
+        num_variables = 26
+        
+        # run logical solve to measure difficulty if a valid completion exists
+        case_steps = -1
+        if cb.solutions():
+            from generate_boards import logical_solve
+            first_sol = cb.solutions()[0]
+            magic_sum = sum(first_sol[0])
+            try:
+                _, case_steps = logical_solve(puzzle, magic_sum)
+            except Exception:
+                case_steps = -1
+        else:
+            case_steps = -1
+            
+        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps
+
+    solver_grid = []
+    for r in range(5):
+        cols = st.columns(5)
+        row_vals = []
+        for c in range(5):
+            with cols[c]:
+                val = st.text_input(
+                    "",
+                    value="",
+                    key=f"solver_cell_{r}_{c}",
+                    max_chars=1,
+                    label_visibility="collapsed"
+                )
+                val = val.strip()
+                if val in [str(i) for i in range(1, 10)]:
+                    row_vals.append(int(val))
+                else:
+                    row_vals.append(None)
+        solver_grid.append(row_vals)
+
+    if st.button("Solve Board", type="primary", key="run_custom_solver_btn_standalone" if standalone else "run_custom_solver_btn_expander", use_container_width=True):
+        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps = solve_custom_board_with_stats(solver_grid)
+        if not sols:
+            st.error(f"❌ No valid solution exists for this board configuration! (Checked {num_constraints} constraints in {elapsed_ms:.2f} ms)")
+        else:
+            st.success(f"🎉 Found {len(sols)} valid completion(s) in {elapsed_ms:.2f} ms!")
+            
+            # Display difficulty parameters if available
+            if case_steps != -1:
+                if case_steps == 0:
+                    diff_rating = "EASY"
+                    diff_color = "#065f46"
+                elif case_steps in [1, 2, 3, 4]:
+                    diff_rating = "MEDIUM"
+                    diff_color = "#78350f"
+                else:
+                    diff_rating = "HARD"
+                    diff_color = "#7f1d1d"
+                
+                st.markdown(
+                    f"🧩 **Complexity:** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;'>{diff_rating}</span> (Requires <b>{case_steps}</b> contradiction step(s))",
+                    unsafe_allow_html=True
+                )
+            
+            st.markdown(
+                f"<div style='font-size:12px; color:#94a3b8; background:#1e293b; padding:8px 12px; border-radius:6px; margin-top:8px; margin-bottom:12px; line-height:1.5;'>"
+                f"🧠 **Solver Statistics:**<br>"
+                f"• Variables Evaluated: <b>{num_variables}</b> (25 grid cells + magic sum)<br>"
+                f"• Constraints Enforced: <b>{num_constraints}</b> magic sum equations<br>"
+                f"• Search Branches: <b>{branches}</b><br>"
+                f"• Conflicts Encountered: <b>{conflicts}</b>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+            
+            for idx, sol in enumerate(sols):
+                st.markdown(f"**Solution #{idx+1}** (Magic Sum = {sum(sol[0])}):")
+                html_grid = "<div style='display:grid; grid-template-columns: repeat(5, 45px); gap: 4px; margin-bottom: 12px;'>"
+                for r_idx in range(5):
+                    for c_idx in range(5):
+                        is_input = solver_grid[r_idx][c_idx] is not None
+                        bg = "#1e293b" if is_input else "#0f766e"
+                        html_grid += f"<div style='width:45px; height:45px; display:flex; align-items:center; justify-content:center; background:{bg}; color:white; font-weight:bold; border-radius:6px; font-size:18px;'>{sol[r_idx][c_idx]}</div>"
+                html_grid += "</div>"
+                st.markdown(html_grid, unsafe_allow_html=True)
+
+# Route to standalone solver if requested
+if st.query_params.get("page") == "solver":
+    render_custom_solver(standalone=True)
+    render_keyboard_listener()
+    st.stop()
+
+# ============================
 # Sidebar — board loader
 # ============================
 def on_board_change():
@@ -314,6 +638,8 @@ with st.sidebar:
     if st.session_state.get("id_error"):
         st.error(st.session_state.id_error)
 
+    st.markdown("---")
+    st.link_button("🛠️ Open Standalone Solver", "/?page=solver", use_container_width=True)
     st.markdown("---")
     st.caption(f"**{len(boards)}** boards loaded")
     st.caption(f"Signed in as **{author}**")
@@ -538,265 +864,9 @@ if st.button("Submit Feedback", type="primary", use_container_width=True):
 # ============================
 st.divider()
 with st.expander("🛠️ Custom Board Solver & Diagnostic"):
-    st.write("Enter digits 1-9 (leave blank for empty cells) to solve any custom 5x5 board:")
-    
-    def solve_custom_board_with_stats(puzzle):
-        import time
-        from ortools.sat.python import cp_model
-        from generate_boards import SolutionCounter, N
-        
-        start_time = time.time()
-        model = cp_model.CpModel()
-        grid = [[model.NewIntVar(1, 9, f"cell_{r}_{c}") for c in range(N)] for r in range(N)]
-        M = model.NewIntVar(5, 45, "M")
-
-        # Connect clues
-        for r in range(N):
-            for c in range(N):
-                if puzzle[r][c] is not None:
-                    model.Add(grid[r][c] == puzzle[r][c])
-
-        # Sum constraints
-        for r in range(N):
-            model.Add(sum(grid[r][c] for c in range(N)) == M)
-        for c in range(N):
-            model.Add(sum(grid[r][c] for r in range(N)) == M)
-        model.Add(sum(grid[i][i] for i in range(N)) == M)
-        model.Add(sum(grid[i][N - 1 - i] for i in range(N)) == M)
-
-        solver = cp_model.CpSolver()
-        solver.parameters.enumerate_all_solutions = True
-        solver.parameters.num_search_workers = 1
-        
-        cb = SolutionCounter(grid, limit=5)
-        solver.Solve(model, cb)
-        
-        elapsed_ms = (time.time() - start_time) * 1000
-        
-        branches = solver.NumBranches()
-        conflicts = solver.NumConflicts()
-        num_constraints = len(model.Proto().constraints)
-        num_variables = 26 # 25 cells + M
-        
-        # run logical solve to measure difficulty if a valid completion exists
-        case_steps = -1
-        if cb.solutions():
-            from generate_boards import logical_solve
-            first_sol = cb.solutions()[0]
-            magic_sum = sum(first_sol[0])
-            try:
-                _, case_steps = logical_solve(puzzle, magic_sum)
-            except Exception:
-                case_steps = -1
-        else:
-            case_steps = -1
-            
-        return cb.solutions(), branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps
-
-    solver_grid = []
-    for r in range(5):
-        cols = st.columns(5)
-        row_vals = []
-        for c in range(5):
-            with cols[c]:
-                val = st.text_input(
-                    "",
-                    value="",
-                    key=f"solver_cell_{r}_{c}",
-                    max_chars=1,
-                    label_visibility="collapsed"
-                )
-                val = val.strip()
-                if val in [str(i) for i in range(1, 10)]:
-                    row_vals.append(int(val))
-                else:
-                    row_vals.append(None)
-        solver_grid.append(row_vals)
-
-    if st.button("Solve Board", type="primary", key="run_custom_solver", use_container_width=True):
-        sols, branches, conflicts, num_constraints, num_variables, elapsed_ms, case_steps = solve_custom_board_with_stats(solver_grid)
-        if not sols:
-            st.error(f"❌ No valid solution exists for this board configuration! (Checked {num_constraints} constraints in {elapsed_ms:.2f} ms)")
-        else:
-            st.success(f"🎉 Found {len(sols)} valid completion(s) in {elapsed_ms:.2f} ms!")
-            
-            # Display difficulty parameters if available
-            if case_steps != -1:
-                if case_steps == 0:
-                    diff_rating = "EASY"
-                    diff_color = "#065f46"
-                elif case_steps in [1, 2, 3, 4]:
-                    diff_rating = "MEDIUM"
-                    diff_color = "#78350f"
-                else:
-                    diff_rating = "HARD"
-                    diff_color = "#7f1d1d"
-                
-                st.markdown(
-                    f"🧩 **Complexity:** <span style='background:{diff_color}; color:white; border-radius:4px; padding:2px 8px; font-size:12px; font-weight:700;'>{diff_rating}</span> (Requires <b>{case_steps}</b> contradiction step(s))",
-                    unsafe_allow_html=True
-                )
-            
-            st.markdown(
-                f"<div style='font-size:12px; color:#94a3b8; background:#1e293b; padding:8px 12px; border-radius:6px; margin-top:8px; margin-bottom:12px; line-height:1.5;'>"
-                f"🧠 **Solver Statistics:**<br>"
-                f"• Variables Evaluated: <b>{num_variables}</b> (25 grid cells + magic sum)<br>"
-                f"• Constraints Enforced: <b>{num_constraints}</b> magic sum equations<br>"
-                f"• Search Branches: <b>{branches}</b><br>"
-                f"• Conflicts Encountered: <b>{conflicts}</b>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-            
-            for idx, sol in enumerate(sols):
-                st.markdown(f"**Solution #{idx+1}** (Magic Sum = {sum(sol[0])}):")
-                html_grid = "<div style='display:grid; grid-template-columns: repeat(5, 45px); gap: 4px; margin-bottom: 12px;'>"
-                for r_idx in range(5):
-                    for c_idx in range(5):
-                        is_input = solver_grid[r_idx][c_idx] is not None
-                        bg = "#1e293b" if is_input else "#0f766e"
-                        html_grid += f"<div style='width:45px; height:45px; display:flex; align-items:center; justify-content:center; background:{bg}; color:white; font-weight:bold; border-radius:6px; font-size:18px;'>{sol[r_idx][c_idx]}</div>"
-                html_grid += "</div>"
-                st.markdown(html_grid, unsafe_allow_html=True)
+    render_custom_solver(standalone=False)
 
 # ============================
 # Keyboard Listener (Parent DOM Event Interceptor)
 # ============================
-import streamlit.components.v1 as components
-
-components.html(
-    f"""
-    <script>
-    const parentDoc = window.parent.document;
-    if (!window.parent.__summetry_keyboard_listener_added__) {{
-        window.parent.__summetry_keyboard_listener_added__ = true;
-        
-        // Auto-select text in solver inputs on focus
-        parentDoc.addEventListener('focusin', function(e) {{
-            if (e.target && e.target.tagName === 'INPUT') {{
-                const container = e.target.closest('[class*="st-key-solver_cell_"]');
-                if (container) {{
-                    e.target.select();
-                }}
-            }}
-        }});
-        
-        // Keydown listener
-        parentDoc.addEventListener('keydown', function(e) {{
-            let key = e.key;
-            
-            // Check if user is typing in the Custom Solver grid inputs
-            if (e.target && e.target.tagName === 'INPUT') {{
-                const inputs = Array.from(parentDoc.querySelectorAll('[class*="st-key-solver_cell_"] input'));
-                const idx = inputs.indexOf(e.target);
-                if (idx !== -1) {{
-                    let r = Math.floor(idx / 5);
-                    let c = idx % 5;
-                    
-                    // 1. Grid cell navigation with Arrow Keys
-                    if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
-                        e.preventDefault();
-                        let nr = r, nc = c;
-                        if (key === 'ArrowUp') nr--;
-                        else if (key === 'ArrowDown') nr++;
-                        else if (key === 'ArrowLeft') nc--;
-                        else if (key === 'ArrowRight') nc++;
-                        
-                        if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) {{
-                            const nextInput = inputs[nr * 5 + nc];
-                            if (nextInput) {{
-                                nextInput.focus();
-                                nextInput.select();
-                            }}
-                        }}
-                        return;
-                    }}
-                    
-                    // 2. Auto-overwrite and keep focus on Digit Key (1-9)
-                    if (key >= '1' && key <= '9') {{
-                        e.preventDefault();
-                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        nativeSetter.call(e.target, key);
-                        e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        return;
-                    }}
-                    
-                    // 3. Backspace - clear and keep focus
-                    if (key === 'Backspace' || key === 'Delete' || key === '0' || key.toLowerCase() === 'x') {{
-                        e.preventDefault();
-                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        nativeSetter.call(e.target, '');
-                        e.target.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        e.target.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                        return;
-                    }}
-                }}
-            }}
-            
-            // Standard inputs check (notes, name prompt etc.)
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {{
-                return;
-            }}
-            
-            // Normal board keyboard controls
-            if (key >= '1' && key <= '9') {{
-                const btn = parentDoc.querySelector(`.st-key-pad${{key}} button`);
-                if (btn) {{
-                    btn.click();
-                }}
-            }} else if (key === 'Backspace' || key === 'Delete' || key.toLowerCase() === 'x' || key === '0') {{
-                const btn = parentDoc.querySelector('.st-key-pad_clear button');
-                if (btn) {{
-                    btn.click();
-                }}
-            }}
-            
-            // Normal board cell navigation with Arrow Keys
-            if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight') {{
-                e.preventDefault();
-                const stateEl = parentDoc.getElementById('summetry-state');
-                let currentSelRow = stateEl ? parseInt(stateEl.getAttribute('data-selected-row')) : -1;
-                let currentSelCol = stateEl ? parseInt(stateEl.getAttribute('data-selected-col')) : -1;
-                
-                if (currentSelRow === -1) {{
-                    for (let r = 0; r < 5; r++) {{
-                        for (let c = 0; c < 5; c++) {{
-                            const btn = parentDoc.querySelector(`.st-key-c${{r}}${{c}} button`);
-                            if (btn) {{
-                                btn.click();
-                                return;
-                            }}
-                        }}
-                    }}
-                    return;
-                }}
-                
-                let new_r = currentSelRow;
-                let new_c = currentSelCol;
-                let nextBtn = null;
-                while (true) {{
-                    if (key === 'ArrowUp') new_r--;
-                    else if (key === 'ArrowDown') new_r++;
-                    else if (key === 'ArrowLeft') new_c--;
-                    else if (key === 'ArrowRight') new_c++;
-                    
-                    if (new_r < 0 || new_r >= 5 || new_c < 0 || new_c >= 5) {{
-                        break;
-                    }}
-                    
-                    nextBtn = parentDoc.querySelector(`.st-key-c${{new_r}}${{new_c}} button`);
-                    if (nextBtn) {{
-                        nextBtn.click();
-                        break;
-                    }}
-                }}
-                return;
-            }}
-        }});
-    }}
-    </script>
-    """,
-    height=0,
-    width=0
-)
+render_keyboard_listener()
