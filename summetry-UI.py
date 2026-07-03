@@ -35,7 +35,6 @@ def get_sheet():
 # ============================
 # Load boards
 # ============================
-@st.cache_data
 def load_boards():
     with open("magic_boards2.json", "r") as f:
         data = json.load(f)
@@ -45,7 +44,6 @@ def load_boards():
     by_id = {b["board_id"]: b for b in data}
     return data, by_id
 
-@st.cache_data
 def load_boards_300():
     try:
         with open("magic_boards_300.json", "r") as f:
