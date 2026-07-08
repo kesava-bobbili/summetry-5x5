@@ -29,11 +29,11 @@
       return;
     }
 
-    // Search main queue
-    let found = boards.find((b: any) => b.board_id === cleanId);
+    // Search main queue (supports full UUID or 8-character prefix)
+    let found = boards.find((b: any) => b.board_id === cleanId || b.board_id.startsWith(cleanId));
     if (!found) {
       // Search 300 database
-      found = boards_300.find((b: any) => b.board_id === cleanId);
+      found = boards_300.find((b: any) => b.board_id === cleanId || b.board_id.startsWith(cleanId));
     }
 
     if (found) {
