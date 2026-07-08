@@ -1,0 +1,82 @@
+[
+  {
+    "board_id": "2353157d-0a2e-5879-73d2-a41708fdc775",
+    "difficulty": "Hard",
+    "puzzle": [
+      [
+        null,
+        null,
+        null,
+        9,
+        5
+      ],
+      [
+        null,
+        null,
+        5,
+        3,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        6
+      ],
+      [
+        null,
+        null,
+        9,
+        7,
+        null
+      ],
+      [
+        9,
+        1,
+        1,
+        5,
+        null
+      ]
+    ],
+    "solution": [
+      [
+        1,
+        1,
+        9,
+        9,
+        5
+      ],
+      [
+        6,
+        7,
+        5,
+        3,
+        4
+      ],
+      [
+        8,
+        9,
+        1,
+        1,
+        6
+      ],
+      [
+        1,
+        7,
+        9,
+        7,
+        1
+      ],
+      [
+        9,
+        1,
+        1,
+        5,
+        9
+      ]
+    ],
+    "magic_sum": 25,
+    "attempts": 1
+  }
+]
