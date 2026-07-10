@@ -64,7 +64,7 @@
     <pre>{getEmojiGrid()}</pre>
   </div>
 
-  <button class="share-btn" class:copied on:click={handleShare}>
+  <button class="share-btn" class:copied onclick={handleShare}>
     {copied ? '✅ Copied to Clipboard!' : '🔗 Share Result'}
   </button>
 </div>

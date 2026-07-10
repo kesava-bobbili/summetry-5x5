@@ -1,7 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import boards from '$lib/data/magic_boards2.json';
-  import boards_300 from '$lib/data/magic_boards_300.json';
 
   let solverGrid = $state<(string)[][]>(Array(5).fill(null).map(() => Array(5).fill('')));
   let searchId = $state('');
@@ -14,6 +12,7 @@
   let variablesCount = $state(26);
   let constraintsCount = $state(12);
   let branchesCount = $state(0);
+  let conflictsCount = $state(0);
   let humanDiffRating = $state('');
 
   function handleCellInput(r: number, c: number, val: string) {
@@ -21,7 +20,7 @@
     solverGrid[r][c] = cleanVal.slice(0, 1);
   }
 
-  function loadBoardById() {
+  async function loadBoardById() {
     loadStatus = '';
     const cleanId = searchId.trim();
     if (!cleanId) {
@@ -29,224 +28,59 @@
       return;
     }
 
-    // Search main queue (supports full UUID or 8-character prefix)
-    let found = boards.find((b: any) => b.board_id === cleanId || b.board_id.startsWith(cleanId));
-    if (!found) {
-      // Search 300 database
-      found = boards_300.find((b: any) => b.board_id === cleanId || b.board_id.startsWith(cleanId));
-    }
-
-    if (found) {
-      const puzzle = found.puzzle;
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          solverGrid[r][c] = puzzle[r][c] !== null ? String(puzzle[r][c]) : '';
+    try {
+      const resp = await fetch(`/api/board/${cleanId}`);
+      if (resp.ok) {
+        const found = await resp.json();
+        const puzzle = found.puzzle;
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            solverGrid[r][c] = puzzle[r][c] !== null ? String(puzzle[r][c]) : '';
+          }
         }
+        loadStatus = '✅ Loaded board clues successfully!';
+      } else {
+        loadStatus = '❌ Board ID not found on server database.';
       }
-      loadStatus = '✅ Loaded board clues successfully!';
-    } else {
-      loadStatus = '❌ Board ID not found in daily queue or 300-boards database.';
+    } catch (err) {
+      console.error(err);
+      loadStatus = '⚠️ Network error looking up Board ID.';
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Backtracking Solver Algorithm
+  // Secure Backend CP-SAT Solver Connection
   // ---------------------------------------------------------------------------
-  function runSolver() {
+  async function runSolver() {
     isSolving = true;
     solutions = [];
     branchesCount = 0;
+    conflictsCount = 0;
     humanDiffRating = '';
     
-    const startTime = performance.now();
     const puzzle = solverGrid.map(row => row.map(v => v !== '' ? parseInt(v) : null));
-
-    // Determine target sum M if possible, otherwise we will test candidates
-    let targetM: number | null = null;
-    
-    // Check if any full row/col/diag exists to pin M
-    for (let r = 0; r < 5; r++) {
-      if (puzzle[r].every(v => v !== null)) {
-        targetM = puzzle[r].reduce((a, b) => a! + b!, 0);
-        break;
-      }
-    }
-    if (targetM === null) {
-      for (let c = 0; c < 5; c++) {
-        const col = [0, 1, 2, 3, 4].map(r => puzzle[r][c]);
-        if (col.every(v => v !== null)) {
-          targetM = col.reduce((a, b) => a! + b!, 0);
-          break;
-        }
-      }
-    }
-
-    const mCandidates = targetM !== null ? [targetM] : Array.from({ length: 41 }, (_, i) => i + 5); // 5 to 45
-    const workingGrid = puzzle.map(row => [...row]);
-
-    outer: for (const M of mCandidates) {
-      const results: number[][][] = [];
-      backtrack(0, 0, M, workingGrid, puzzle, results);
-      if (results.length > 0) {
-        solutions.push(...results);
-        if (solutions.length >= 5) break outer;
-      }
-    }
-
-    elapsedMs = Math.round(performance.now() - startTime);
-    isSolving = false;
-
-    if (solutions.length > 0) {
-      // Calculate human difficulty of the custom layout using the first solution
-      const firstSol = solutions[0];
-      const magicSum = firstSol[0].reduce((a, b) => a + b, 0);
-      humanDiffRating = calculateDifficultyHuman(puzzle, firstSol, magicSum);
-    }
-  }
-
-  function backtrack(r: number, c: number, M: number, grid: (number | null)[][], puzzle: (number | null)[][], results: number[][][]) {
-    if (results.length >= 5) return;
-    branchesCount++;
-
-    if (r === 5) {
-      // Validate diagonals
-      const d1 = [0, 1, 2, 3, 4].reduce((a, i) => a + grid[i][i]!, 0);
-      const d2 = [0, 1, 2, 3, 4].reduce((a, i) => a + grid[i][4 - i]!, 0);
-      if (d1 === M && d2 === M) {
-        results.push(grid.map(row => row.map(v => v!)));
-      }
-      return;
-    }
-
-    const nextR = c === 4 ? r + 1 : r;
-    const nextC = c === 4 ? 0 : c + 1;
-
-    if (puzzle[r][c] !== null) {
-      // Pre-filled clue, validate pruning
-      if (c === 4) {
-        const rowSum = grid[r].reduce((a, b) => a! + b!, 0);
-        if (rowSum !== M) return;
-      }
-      if (r === 4) {
-        const colSum = [0, 1, 2, 3, 4].reduce((a, ri) => a + grid[ri][c]!, 0);
-        if (colSum !== M) return;
-      }
-      backtrack(nextR, nextC, M, grid, puzzle, results);
-    } else {
-      // Try digits 1-9
-      for (let val = 1; val <= 9; val++) {
-        grid[r][c] = val;
-
-        // Pruning validation: Row check
-        if (c === 4) {
-          const rowSum = grid[r].reduce((a, b) => a! + b!, 0);
-          if (rowSum !== M) continue;
-        } else {
-          const partialRowSum = grid[r].slice(0, c + 1).reduce((a, b) => a! + b!, 0)!;
-          const remainingCells = 4 - c;
-          if (partialRowSum + remainingCells * 1 > M || partialRowSum + remainingCells * 9 < M) {
-            continue;
-          }
-        }
-
-        // Pruning validation: Column check
-        if (r === 4) {
-          const colSum = [0, 1, 2, 3, 4].reduce((a, ri) => a + grid[ri][c]!, 0);
-          if (colSum !== M) continue;
-        } else {
-          const partialColSum = [0, 1, 2, 3, 4].slice(0, r + 1).reduce((a, ri) => a + grid[ri][c]!, 0);
-          const remainingCells = 4 - r;
-          if (partialColSum + remainingCells * 1 > M || partialColSum + remainingCells * 9 < M) {
-            continue;
-          }
-        }
-
-        backtrack(nextR, nextC, M, grid, puzzle, results);
-      }
-      grid[r][c] = null; // reset
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Human Solver Heuristics
-  // ---------------------------------------------------------------------------
-  function simulateSubtractionSolve(puzzle: (number | null)[][], solution: number[][]): number {
-    const grid = puzzle.map(row => [...row]);
-    let stuckCount = 0;
-    while (true) {
-      const emptyCells: { r: number; c: number }[] = [];
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          if (grid[r][c] === null) emptyCells.push({ r, c });
-        }
-      }
-      if (emptyCells.length === 0) break;
-      
-      let foundLine = null;
-      for (let r = 0; r < 5; r++) {
-        if (grid[r].filter(v => v !== null).length === 4) {
-          foundLine = { r, c: grid[r].indexOf(null) };
-          break;
-        }
-      }
-      if (!foundLine) {
-        for (let c = 0; c < 5; c++) {
-          const colVals = [0, 1, 2, 3, 4].map(r => grid[r][c]);
-          if (colVals.filter(v => v !== null).length === 4) {
-            foundLine = { r: colVals.indexOf(null), c };
-            break;
-          }
-        }
-      }
-      if (!foundLine) {
-        const d1Vals = [0, 1, 2, 3, 4].map(i => grid[i][i]);
-        if (d1Vals.filter(v => v !== null).length === 4) {
-          foundLine = { r: d1Vals.indexOf(null), c: d1Vals.indexOf(null) };
-        }
-      }
-      if (!foundLine) {
-        const d2Vals = [0, 1, 2, 3, 4].map(i => grid[i][4 - i]);
-        if (d2Vals.filter(v => v !== null).length === 4) {
-          const missingIdx = d2Vals.indexOf(null);
-          foundLine = { r: missingIdx, c: 4 - missingIdx };
-        }
-      }
-      
-      if (foundLine) {
-        grid[foundLine.r][foundLine.c] = solution[foundLine.r][foundLine.c];
+    try {
+      const resp = await fetch('/api/solver/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzle })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        solutions = data.solutions;
+        branchesCount = data.branches;
+        conflictsCount = data.conflicts;
+        elapsedMs = data.elapsed_ms;
+        humanDiffRating = data.human_difficulty;
       } else {
-        stuckCount++;
-        const target = emptyCells[0];
-        grid[target.r][target.c] = solution[target.r][target.c];
+        alert("Failed to solve puzzle.");
       }
+    } catch (err) {
+      console.error(err);
+      alert("Network error connecting to solver API.");
+    } finally {
+      isSolving = false;
     }
-    return stuckCount;
-  }
-
-  function calculateDifficultyHuman(puzzle: (number | null)[][], solution: number[][], targetSum: number): string {
-    const stuck = simulateSubtractionSolve(puzzle, solution);
-    
-    let clueLines = 0;
-    for (let r = 0; r < 5; r++) {
-      if (puzzle[r].filter(v => v !== null).length === 4) clueLines++;
-    }
-    for (let c = 0; c < 5; c++) {
-      const colVals = [0, 1, 2, 3, 4].map(r => puzzle[r][c]);
-      if (colVals.filter(v => v !== null).length === 4) clueLines++;
-    }
-    const d1 = [0, 1, 2, 3, 4].map(i => puzzle[i][i]);
-    if (d1.filter(v => v !== null).length === 4) clueLines++;
-    const d2 = [0, 1, 2, 3, 4].map(i => puzzle[i][4 - i]);
-    if (d2.filter(v => v !== null).length === 4) clueLines++;
-
-    let diagClues = 0;
-    for (let i = 0; i < 5; i++) {
-      if (puzzle[i][i] !== null) diagClues++;
-      if (puzzle[i][4 - i] !== null) diagClues++;
-    }
-
-    const score = -2 * stuck + 2 * clueLines - 1 * diagClues - 0.1 * targetSum;
-    return score >= -6.0 ? 'MEDIUM' : 'EASY';
   }
 
   function clearSolverGrid() {
@@ -298,7 +132,7 @@
         placeholder="Enter Board ID (UUID)..." 
         bind:value={searchId}
       />
-      <button class="search-btn" on:click={loadBoardById}>Load Clues</button>
+      <button class="search-btn" onclick={loadBoardById}>Load Clues</button>
     </div>
     {#if loadStatus}
       <p class="status-msg">{loadStatus}</p>
@@ -318,8 +152,8 @@
               data-col={c}
               value={val}
               maxlength="1"
-              on:input={(e) => handleCellInput(r, c, e.currentTarget.value)}
-              on:focus={(e) => e.currentTarget.select()}
+              oninput={(e) => handleCellInput(r, c, e.currentTarget.value)}
+              onfocus={(e) => e.currentTarget.select()}
             />
           {/each}
         </div>
@@ -327,10 +161,10 @@
     </div>
 
     <div class="action-row">
-      <button class="solve-btn" on:click={runSolver} disabled={isSolving}>
+      <button class="solve-btn" onclick={runSolver} disabled={isSolving}>
         {isSolving ? '⚡ Solving...' : '✅ Solve Board'}
       </button>
-      <button class="clear-btn" on:click={clearSolverGrid}>🧹 Clear Grid</button>
+      <button class="clear-btn" onclick={clearSolverGrid}>🧹 Clear Grid</button>
     </div>
   </section>
 

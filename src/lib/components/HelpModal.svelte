@@ -3,11 +3,11 @@
   const dispatch = createEventDispatcher();
 </script>
 
-<div class="modal-backdrop" on:click={() => dispatch('close')} on:keydown|self={(e) => e.key === 'Escape' && dispatch('close')}>
-  <div class="modal-content" on:click|stopPropagation>
+<div class="modal-backdrop" onclick={() => dispatch('close')} onkeydown={(e) => { if (e.target === e.currentTarget && e.key === 'Escape') dispatch('close'); }} tabindex="0" role="button">
+  <div class="modal-content" onclick={(e) => e.stopPropagation()} role="presentation">
     <header class="modal-header">
       <h2>🧩 How to Play Summetry</h2>
-      <button class="close-btn" on:click={() => dispatch('close')}>&times;</button>
+      <button class="close-btn" onclick={() => dispatch('close')}>&times;</button>
     </header>
     <main class="modal-body">
       <p><strong>Summetry</strong> is a 5x5 logic grid puzzle where you fill the cells with digits from <strong>1 to 9</strong> to establish mathematical symmetry.</p>

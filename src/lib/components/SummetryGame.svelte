@@ -3,7 +3,6 @@
   import HelpModal from './HelpModal.svelte';
   import StatsModal from './StatsModal.svelte';
   import ShareSummary from './ShareSummary.svelte';
-  import boards from '$lib/data/magic_boards2.json';
 
   // ---------------------------------------------------------------------------
   // Types & Interfaces
@@ -27,7 +26,7 @@
     magicSum: number;
     solveTime: number; // elapsed time in seconds
     showAnswer: boolean;
-    solution: number[][];
+    solution: number[][] | null;
   }
 
   // ---------------------------------------------------------------------------
@@ -46,103 +45,6 @@
   // Modals visibility state
   let showHelp = $state(false);
   let showStats = $state(false);
-
-  // ---------------------------------------------------------------------------
-  // Math & Solver Helpers
-  // ---------------------------------------------------------------------------
-  function getTodayIndex(total: number): number {
-    const today = new Date();
-    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
-    return dayOfYear % total;
-  }
-
-  function simulateSubtractionSolve(puzzle: (number | null)[][], solution: number[][]): number {
-    const grid = puzzle.map(row => [...row]);
-    let stuckCount = 0;
-    while (true) {
-      const emptyCells: { r: number; c: number }[] = [];
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          if (grid[r][c] === null) emptyCells.push({ r, c });
-        }
-      }
-      if (emptyCells.length === 0) break;
-      
-      let foundLine = null;
-      // Check rows
-      for (let r = 0; r < 5; r++) {
-        if (grid[r].filter(v => v !== null).length === 4) {
-          foundLine = { r, c: grid[r].indexOf(null) };
-          break;
-        }
-      }
-      // Check cols
-      if (!foundLine) {
-        for (let c = 0; c < 5; c++) {
-          const colVals = [0, 1, 2, 3, 4].map(r => grid[r][c]);
-          if (colVals.filter(v => v !== null).length === 4) {
-            foundLine = { r: colVals.indexOf(null), c };
-            break;
-          }
-        }
-      }
-      // Check diag1
-      if (!foundLine) {
-        const d1Vals = [0, 1, 2, 3, 4].map(i => grid[i][i]);
-        if (d1Vals.filter(v => v !== null).length === 4) {
-          foundLine = { r: d1Vals.indexOf(null), c: d1Vals.indexOf(null) };
-        }
-      }
-      // Check diag2
-      if (!foundLine) {
-        const d2Vals = [0, 1, 2, 3, 4].map(i => grid[i][4 - i]);
-        if (d2Vals.filter(v => v !== null).length === 4) {
-          const missingIdx = d2Vals.indexOf(null);
-          foundLine = { r: missingIdx, c: 4 - missingIdx };
-        }
-      }
-      
-      if (foundLine) {
-        grid[foundLine.r][foundLine.c] = solution[foundLine.r][foundLine.c];
-      } else {
-        stuckCount++;
-        const target = emptyCells[0];
-        grid[target.r][target.c] = solution[target.r][target.c];
-      }
-    }
-    return stuckCount;
-  }
-
-  function calculateDifficultyHuman(puzzle: (number | null)[][], solution: number[][], targetSum: number): { rating: string; score: number } {
-    const stuck = simulateSubtractionSolve(puzzle, solution);
-    
-    // Initial 4-clue lines
-    let clueLines = 0;
-    for (let r = 0; r < 5; r++) {
-      if (puzzle[r].filter(v => v !== null).length === 4) clueLines++;
-    }
-    for (let c = 0; c < 5; c++) {
-      const colVals = [0, 1, 2, 3, 4].map(r => puzzle[r][c]);
-      if (colVals.filter(v => v !== null).length === 4) clueLines++;
-    }
-    const d1 = [0, 1, 2, 3, 4].map(i => puzzle[i][i]);
-    if (d1.filter(v => v !== null).length === 4) clueLines++;
-    const d2 = [0, 1, 2, 3, 4].map(i => puzzle[i][4 - i]);
-    if (d2.filter(v => v !== null).length === 4) clueLines++;
-
-    // Diagonal clues
-    let diagClues = 0;
-    for (let i = 0; i < 5; i++) {
-      if (puzzle[i][i] !== null) diagClues++;
-      if (puzzle[i][4 - i] !== null) diagClues++;
-    }
-
-    const score = -2 * stuck + 2 * clueLines - 1 * diagClues - 0.1 * targetSum;
-    return {
-      rating: score >= -6.0 ? 'MEDIUM' : 'EASY',
-      score
-    };
-  }
 
   // ---------------------------------------------------------------------------
   // Stats & LocalStorage Helpers
@@ -188,8 +90,7 @@
     if (timerInterval) clearInterval(timerInterval);
 
     const puzzle = boardData.puzzle;
-    const solution = boardData.solution;
-    const magicSum = solution ? sumRow(solution[0]) : 34;
+    const magicSum = 34;
 
     const sessionGrid: Cell[][] = [];
     for (let r = 0; r < 5; r++) {
@@ -215,7 +116,7 @@
       magicSum,
       solveTime: 0,
       showAnswer: false,
-      solution
+      solution: null
     };
 
     selectedCell = null;
@@ -227,10 +128,6 @@
         saveSession(session);
       }
     }, 1000);
-  }
-
-  function sumRow(row: (number | null)[]): number {
-    return row.reduce((a, b) => (a || 0) + (b || 0), 0) || 0;
   }
 
   function getRowSum(rIdx: number): { sum: number; complete: boolean } {
@@ -265,7 +162,7 @@
     return { sum, complete };
   }
 
-  function handleCheck() {
+  async function handleCheck() {
     if (!session) return;
     
     // Ensure session integrity
@@ -289,19 +186,29 @@
       return;
     }
 
-    const sums = new Set<number>();
-    for (let r = 0; r < 5; r++) sums.add(getRowSum(r).sum);
-    for (let c = 0; c < 5; c++) sums.add(getColSum(c).sum);
-    sums.add(getDiag1Sum().sum);
-    sums.add(getDiag2Sum().sum);
-
-    if (sums.size === 1) {
-      session.status = 'won';
-      if (timerInterval) clearInterval(timerInterval);
-      saveSession(session);
-      updateGlobalStats(true, session.solveTime);
-    } else {
-      alert("❌ The sums do not match on all rows, columns, and diagonals!");
+    const gridValues = session.grid.map(row => row.map(cell => cell.val));
+    try {
+      const resp = await fetch('/api/board/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board_id: session.boardId,
+          grid: gridValues
+        })
+      });
+      const data = await resp.json();
+      if (data.correct) {
+        session.status = 'won';
+        session.magicSum = data.magic_sum;
+        if (timerInterval) clearInterval(timerInterval);
+        saveSession(session);
+        updateGlobalStats(true, session.solveTime);
+      } else {
+        alert("❌ Check failed: " + (data.message || "Sums mismatch. Try again!"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("⚠️ Server error verifying solution.");
     }
   }
 
@@ -351,7 +258,7 @@
     loadActiveBoard();
   }
 
-  function loadActiveBoard() {
+  async function loadActiveBoard() {
     const saved = loadSession();
     if (saved) {
       session = saved;
@@ -365,14 +272,48 @@
         }, 1000);
       }
     } else {
-      if (mode === 'daily') {
-        const boardIdx = getTodayIndex(boards.length);
-        startNewGame(boards[boardIdx]);
-      } else {
-        const randomBoard = boards[Math.floor(Math.random() * boards.length)];
-        startNewGame(randomBoard);
+      const url = mode === 'daily' ? '/api/board/daily' : '/api/board/random';
+      try {
+        const resp = await fetch(url);
+        const boardData = await resp.json();
+        startNewGame(boardData);
+      } catch (err) {
+        console.error(err);
       }
     }
+  }
+
+  async function startPracticeGame() {
+    try {
+      const resp = await fetch('/api/board/random');
+      const boardData = await resp.json();
+      startNewGame(boardData);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function toggleShowAnswer() {
+    if (!session) return;
+    if (!session.showAnswer) {
+      if (!session.solution) {
+        try {
+          const resp = await fetch(`/api/board/${session.boardId}/solution`);
+          if (resp.ok) {
+            const data = await resp.json();
+            session.solution = data.solution;
+          }
+        } catch (err) {
+          console.error(err);
+          alert("Failed to load solution from server.");
+          return;
+        }
+      }
+      session.showAnswer = true;
+    } else {
+      session.showAnswer = false;
+    }
+    saveSession(session);
   }
 
   onMount(() => {
@@ -391,13 +332,13 @@
     <div class="header-left">
       <h1>Summetry</h1>
       <div class="mode-toggle">
-        <button class:active={mode === 'daily'} on:click={() => toggleMode('daily')}>📅 Daily</button>
-        <button class:active={mode === 'practice'} on:click={() => toggleMode('practice')}>🔀 Practice</button>
+        <button class:active={mode === 'daily'} onclick={() => toggleMode('daily')}>📅 Daily</button>
+        <button class:active={mode === 'practice'} onclick={() => toggleMode('practice')}>🔀 Practice</button>
       </div>
     </div>
     <div class="header-right">
-      <button class="icon-btn" on:click={() => showHelp = true}>❓ Help</button>
-      <button class="icon-btn" on:click={() => showStats = true}>📊 Stats</button>
+      <button class="icon-btn" onclick={() => showHelp = true}>❓ Help</button>
+      <button class="icon-btn" onclick={() => showStats = true}>📊 Stats</button>
     </div>
   </header>
 
@@ -429,7 +370,7 @@
                 class="grid-cell"
                 class:clue={cell.isClue}
                 class:selected={selectedCell?.r === rIdx && selectedCell?.c === cIdx}
-                on:click={() => handleCellClick(rIdx, cIdx)}
+                onclick={() => handleCellClick(rIdx, cIdx)}
               >
                 {cell.val || ''}
               </button>
@@ -456,20 +397,20 @@
     <!-- Control Buttons -->
     <div class="controls-panel">
       {#if session.status === 'typing'}
-        <button class="primary-btn check-btn" on:click={handleCheck}>✅ Check Solution</button>
-        <button class="secondary-btn" on:click={() => session!.showAnswer = !session!.showAnswer}>
+        <button class="primary-btn check-btn" onclick={handleCheck}>✅ Check Solution</button>
+        <button class="secondary-btn" onclick={toggleShowAnswer}>
           {session.showAnswer ? '👁️ Hide Answer' : '👁️ Show Answer'}
         </button>
       {/if}
 
       {#if mode === 'practice'}
-        <button class="secondary-btn" on:click={() => startNewGame(boards[Math.floor(Math.random() * boards.length)])}>
+        <button class="secondary-btn" onclick={startPracticeGame}>
           🔀 New Practice Game
         </button>
       {/if}
     </div>
 
-    {#if session.showAnswer}
+    {#if session.showAnswer && session.solution}
       <div class="solution-box">
         <h3>💡 Solution Matrix:</h3>
         <div class="solution-grid">

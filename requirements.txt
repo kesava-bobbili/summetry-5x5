@@ -3,3 +3,5 @@ ortools
 pandas
 gspread
 google-auth
+fastapi
+uvicorn
