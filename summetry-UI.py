@@ -111,6 +111,54 @@ def save_note(board_id, author, text, rating="Note"):
         rating
     ])
 
+def get_variables_for_board(puzzle, solution):
+    if puzzle is None or solution is None:
+        return None
+    # Run a simple deadlock detection simulation
+    grid = [row[:] for row in puzzle]
+    deadlock_cells = []
+    while True:
+        empty_cells = [(r, c) for r in range(5) for c in range(5) if grid[r][c] is None]
+        if not empty_cells:
+            break
+        found_line = None
+        for r in range(5):
+            if sum(1 for c in range(5) if grid[r][c] is not None) == 4:
+                found_line = (r, next(i for i in range(5) if grid[r][i] is None))
+                break
+        if not found_line:
+            for c in range(5):
+                if sum(1 for r in range(5) if grid[r][c] is not None) == 4:
+                    found_line = (next(i for i in range(5) if grid[i][c] is None), c)
+                    break
+        if not found_line:
+            if sum(1 for i in range(5) if grid[i][i] is not None) == 4:
+                found_line = (next(j for j in range(5) if grid[j][j] is None), next(j for j in range(5) if grid[j][j] is None))
+        if not found_line:
+            if sum(1 for i in range(5) if grid[i][4-i] is not None) == 4:
+                found_line = (next(j for j in range(5) if grid[j][4-j] is None), 4 - next(j for j in range(5) if grid[j][4-j] is None))
+        
+        if found_line:
+            r, c = found_line
+            grid[r][c] = solution[r][c]
+        else:
+            deadlock_cells = empty_cells
+            break
+            
+    if len(deadlock_cells) >= 2:
+        c1 = deadlock_cells[0]
+        c2 = deadlock_cells[1]
+        v1 = solution[c1[0]][c1[1]]
+        v2 = solution[c2[0]][c2[1]]
+        offset = v2 - v1
+        return {
+            "cell_1": c1,
+            "cell_2": c2,
+            "offset": offset,
+            "name": "x"
+        }
+    return None
+
 # ============================
 # Session state
 # ============================
@@ -621,6 +669,8 @@ def on_board_change():
 with st.sidebar:
     st.header("Load Board")
 
+    st.checkbox("🧮 Enable Variables Mode", key="variables_mode")
+
     st.subheader("Filter by Difficulty")
     diff_options = ["All", "Easy", "Medium", "Hard"]
     selected_diff = st.selectbox("Difficulty Filter", diff_options, key="selected_difficulty_filter", label_visibility="collapsed")
@@ -735,6 +785,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+var_info = None
+if st.session_state.get("variables_mode", False):
+    var_info = get_variables_for_board(st.session_state.puzzle, st.session_state.solution)
+
 for r in range(size):
     cols = st.columns([1, 1, 1, 1, 1, 0.15, 1.4])
 
@@ -745,7 +799,19 @@ for r in range(size):
                 st.markdown(f"<div class='given'>{given}</div>", unsafe_allow_html=True)
             else:
                 val      = cell_values[r][c]
-                label    = str(val) if val is not None else "·"
+                if var_info and (r, c) == var_info["cell_1"]:
+                    label = f"x"
+                    if val is not None:
+                        label += f"={val}"
+                elif var_info and (r, c) == var_info["cell_2"]:
+                    offset = var_info["offset"]
+                    sign = "+" if offset >= 0 else "-"
+                    label = f"x{sign}{abs(offset)}"
+                    if val is not None:
+                        label += f"={val}"
+                else:
+                    label    = str(val) if val is not None else "·"
+                
                 is_sel   = sel == (r, c)
                 if st.button(label, key=f"c{r}{c}", use_container_width=True,
                              type="primary" if is_sel else "secondary"):
@@ -791,17 +857,60 @@ st.markdown(
 # ============================
 if sel is not None:
     r, c = sel
-    st.markdown(f"**Cell ({r+1}, {c+1}) →** pick a number or clear:")
+    is_variable_cell = False
+    cell_type = None
+    if var_info:
+        if (r, c) == var_info["cell_1"]:
+            is_variable_cell = True
+            cell_type = "cell_1"
+        elif (r, c) == var_info["cell_2"]:
+            is_variable_cell = True
+            cell_type = "cell_2"
+
+    if is_variable_cell:
+        offset = var_info["offset"]
+        sign = "+" if offset >= 0 else "-"
+        lbl_formula = "x" if cell_type == "cell_1" else f"x{sign}{abs(offset)}"
+        st.markdown(f"**Variable Cell ({r+1}, {c+1}) [{lbl_formula}] →** pick value:")
+    else:
+        st.markdown(f"**Cell ({r+1}, {c+1}) →** pick a number or clear:")
+
     pad_cols = st.columns(10)
     for i, digit in enumerate(range(1, 10)):
         with pad_cols[i]:
             if st.button(str(digit), key=f"pad{digit}"):
-                cell_values[r][c] = digit
-                st.session_state.selected = None
-                st.rerun()
+                if is_variable_cell:
+                    offset = var_info["offset"]
+                    sign = "+" if offset >= 0 else "-"
+                    if cell_type == "cell_1":
+                        linked_val = digit + offset
+                        if not (1 <= linked_val <= 9):
+                            st.toast(f"⚠️ Invalid: x={digit} forces linked cell (x{sign}{abs(offset)}) to {linked_val}, out of bounds [1-9]!")
+                        else:
+                            cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = digit
+                            cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = linked_val
+                            st.session_state.selected = None
+                            st.rerun()
+                    else:  # cell_type == "cell_2"
+                        base_val = digit - offset
+                        if not (1 <= base_val <= 9):
+                            st.toast(f"⚠️ Invalid: linked cell value {digit} forces base cell x to {base_val}, out of bounds [1-9]!")
+                        else:
+                            cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = base_val
+                            cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = digit
+                            st.session_state.selected = None
+                            st.rerun()
+                else:
+                    cell_values[r][c] = digit
+                    st.session_state.selected = None
+                    st.rerun()
     with pad_cols[9]:
         if st.button("✕", key="pad_clear"):
-            cell_values[r][c] = None
+            if is_variable_cell:
+                cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = None
+                cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = None
+            else:
+                cell_values[r][c] = None
             st.session_state.selected = None
             st.rerun()
 
