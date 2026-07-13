@@ -113,51 +113,60 @@ def save_note(board_id, author, text, rating="Note"):
 
 def get_variables_for_board(puzzle, solution):
     if puzzle is None or solution is None:
-        return None
-    # Run a simple deadlock detection simulation
-    grid = [row[:] for row in puzzle]
-    deadlock_cells = []
-    while True:
-        empty_cells = [(r, c) for r in range(5) for c in range(5) if grid[r][c] is None]
-        if not empty_cells:
-            break
-        found_line = None
-        for r in range(5):
-            if sum(1 for c in range(5) if grid[r][c] is not None) == 4:
-                found_line = (r, next(i for i in range(5) if grid[r][i] is None))
-                break
-        if not found_line:
-            for c in range(5):
-                if sum(1 for r in range(5) if grid[r][c] is not None) == 4:
-                    found_line = (next(i for i in range(5) if grid[i][c] is None), c)
-                    break
-        if not found_line:
-            if sum(1 for i in range(5) if grid[i][i] is not None) == 4:
-                found_line = (next(j for j in range(5) if grid[j][j] is None), next(j for j in range(5) if grid[j][j] is None))
-        if not found_line:
-            if sum(1 for i in range(5) if grid[i][4-i] is not None) == 4:
-                found_line = (next(j for j in range(5) if grid[j][4-j] is None), 4 - next(j for j in range(5) if grid[j][4-j] is None))
-        
-        if found_line:
-            r, c = found_line
-            grid[r][c] = solution[r][c]
-        else:
-            deadlock_cells = empty_cells
-            break
+        return {}
+    
+    # Identify all empty cells
+    empty_cells = [(r, c) for r in range(5) for c in range(5) if puzzle[r][c] is None]
+    paired_cells = set()
+    variables_map = {}
+    
+    # Available variable names
+    var_names = ["x", "y", "z", "w", "p", "q"]
+    var_idx = 0
+    
+    for r, c in empty_cells:
+        if (r, c) in paired_cells:
+            continue
             
-    if len(deadlock_cells) >= 2:
-        c1 = deadlock_cells[0]
-        c2 = deadlock_cells[1]
-        v1 = solution[c1[0]][c1[1]]
-        v2 = solution[c2[0]][c2[1]]
-        offset = v2 - v1
-        return {
-            "cell_1": c1,
-            "cell_2": c2,
-            "offset": offset,
-            "name": "x"
-        }
-    return None
+        # Possible mirror candidates:
+        mirrors = [
+            (r, 4 - c),       # Horizontal reflection
+            (4 - r, c),       # Vertical reflection
+            (4 - r, 4 - c),   # Central rotation reflection
+        ]
+        
+        for mr, mc in mirrors:
+            if (mr, mc) == (r, c):
+                continue # Skip self-mirror (e.g. center cell)
+                
+            # If the mirror cell is also empty and not yet paired
+            if puzzle[mr][mc] is None and (mr, mc) not in paired_cells:
+                # Pair them up!
+                var_name = var_names[var_idx % len(var_names)]
+                var_idx += 1
+                
+                v1 = solution[r][c]
+                v2 = solution[mr][mc]
+                offset = v2 - v1
+                
+                variables_map[(r, c)] = {
+                    "name": var_name,
+                    "role": "cell_1",
+                    "offset": offset,
+                    "partner": (mr, mc)
+                }
+                variables_map[(mr, mc)] = {
+                    "name": var_name,
+                    "role": "cell_2",
+                    "offset": offset,
+                    "partner": (r, c)
+                }
+                
+                paired_cells.add((r, c))
+                paired_cells.add((mr, mc))
+                break
+                
+    return variables_map
 
 # ============================
 # Session state
@@ -785,9 +794,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-var_info = None
+var_map = {}
 if st.session_state.get("variables_mode", False):
-    var_info = get_variables_for_board(st.session_state.puzzle, st.session_state.solution)
+    var_map = get_variables_for_board(st.session_state.puzzle, st.session_state.solution)
 
 for r in range(size):
     cols = st.columns([1, 1, 1, 1, 1, 0.15, 1.4])
@@ -799,14 +808,14 @@ for r in range(size):
                 st.markdown(f"<div class='given'>{given}</div>", unsafe_allow_html=True)
             else:
                 val      = cell_values[r][c]
-                if var_info and (r, c) == var_info["cell_1"]:
-                    label = f"x"
-                    if val is not None:
-                        label += f"={val}"
-                elif var_info and (r, c) == var_info["cell_2"]:
-                    offset = var_info["offset"]
-                    sign = "+" if offset >= 0 else "-"
-                    label = f"x{sign}{abs(offset)}"
+                if var_map and (r, c) in var_map:
+                    info = var_map[(r, c)]
+                    if info["role"] == "cell_1":
+                        label = f"{info['name']}"
+                    else:
+                        offset = info["offset"]
+                        sign = "+" if offset >= 0 else "-"
+                        label = f"{info['name']}{sign}{abs(offset)}"
                     if val is not None:
                         label += f"={val}"
                 else:
@@ -857,20 +866,13 @@ st.markdown(
 # ============================
 if sel is not None:
     r, c = sel
-    is_variable_cell = False
-    cell_type = None
-    if var_info:
-        if (r, c) == var_info["cell_1"]:
-            is_variable_cell = True
-            cell_type = "cell_1"
-        elif (r, c) == var_info["cell_2"]:
-            is_variable_cell = True
-            cell_type = "cell_2"
+    var_info = var_map.get((r, c))
 
-    if is_variable_cell:
+    if var_info:
         offset = var_info["offset"]
         sign = "+" if offset >= 0 else "-"
-        lbl_formula = "x" if cell_type == "cell_1" else f"x{sign}{abs(offset)}"
+        role = var_info["role"]
+        lbl_formula = f"{var_info['name']}" if role == "cell_1" else f"{var_info['name']}{sign}{abs(offset)}"
         st.markdown(f"**Variable Cell ({r+1}, {c+1}) [{lbl_formula}] →** pick value:")
     else:
         st.markdown(f"**Cell ({r+1}, {c+1}) →** pick a number or clear:")
@@ -879,25 +881,28 @@ if sel is not None:
     for i, digit in enumerate(range(1, 10)):
         with pad_cols[i]:
             if st.button(str(digit), key=f"pad{digit}"):
-                if is_variable_cell:
+                if var_info:
+                    role = var_info["role"]
                     offset = var_info["offset"]
                     sign = "+" if offset >= 0 else "-"
-                    if cell_type == "cell_1":
+                    partner_r, partner_c = var_info["partner"]
+                    
+                    if role == "cell_1":
                         linked_val = digit + offset
                         if not (1 <= linked_val <= 9):
-                            st.toast(f"⚠️ Invalid: x={digit} forces linked cell (x{sign}{abs(offset)}) to {linked_val}, out of bounds [1-9]!")
+                            st.toast(f"⚠️ Invalid: {var_info['name']}={digit} forces linked cell ({var_info['name']}{sign}{abs(offset)}) to {linked_val}, out of bounds [1-9]!")
                         else:
-                            cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = digit
-                            cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = linked_val
+                            cell_values[r][c] = digit
+                            cell_values[partner_r][partner_c] = linked_val
                             st.session_state.selected = None
                             st.rerun()
-                    else:  # cell_type == "cell_2"
+                    else:  # role == "cell_2"
                         base_val = digit - offset
                         if not (1 <= base_val <= 9):
-                            st.toast(f"⚠️ Invalid: linked cell value {digit} forces base cell x to {base_val}, out of bounds [1-9]!")
+                            st.toast(f"⚠️ Invalid: linked cell value {digit} forces base cell {var_info['name']} to {base_val}, out of bounds [1-9]!")
                         else:
-                            cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = base_val
-                            cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = digit
+                            cell_values[partner_r][partner_c] = base_val
+                            cell_values[r][c] = digit
                             st.session_state.selected = None
                             st.rerun()
                 else:
@@ -906,9 +911,10 @@ if sel is not None:
                     st.rerun()
     with pad_cols[9]:
         if st.button("✕", key="pad_clear"):
-            if is_variable_cell:
-                cell_values[var_info["cell_1"][0]][var_info["cell_1"][1]] = None
-                cell_values[var_info["cell_2"][0]][var_info["cell_2"][1]] = None
+            if var_info:
+                partner_r, partner_c = var_info["partner"]
+                cell_values[r][c] = None
+                cell_values[partner_r][partner_c] = None
             else:
                 cell_values[r][c] = None
             st.session_state.selected = None
