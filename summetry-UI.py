@@ -810,7 +810,7 @@ for r in range(size):
                 val      = cell_values[r][c]
                 if var_map and (r, c) in var_map:
                     info = var_map[(r, c)]
-                    if info["role"] == "cell_1":
+                    if info["role"] == "cell_1" or info["offset"] == 0:
                         label = f"{info['name']}"
                     else:
                         offset = info["offset"]
@@ -872,7 +872,7 @@ if sel is not None:
         offset = var_info["offset"]
         sign = "+" if offset >= 0 else "-"
         role = var_info["role"]
-        lbl_formula = f"{var_info['name']}" if role == "cell_1" else f"{var_info['name']}{sign}{abs(offset)}"
+        lbl_formula = f"{var_info['name']}" if (role == "cell_1" or offset == 0) else f"{var_info['name']}{sign}{abs(offset)}"
         st.markdown(f"**Variable Cell ({r+1}, {c+1}) [{lbl_formula}] →** pick value:")
     else:
         st.markdown(f"**Cell ({r+1}, {c+1}) →** pick a number or clear:")
