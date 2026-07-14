@@ -59,6 +59,7 @@
     solveTime: number; 
     showAnswer: boolean;
     solution: number[][] | null;
+    variables?: Record<string, { cell_1: [number, number], cell_2: [number, number], offset: number }> | null;
   }
 
   interface Stats {
@@ -159,6 +160,7 @@
   let showHelp = $state(false);
   let showStats = $state(false);
   let timerInterval: any = null;
+  let variablesMode = $state(false);
 
   // ---------------------------------------------------------------------------
   // Derived Helpers
@@ -166,6 +168,29 @@
   // Contains: gameId, gameInProgress, sleep, format helpers.
   // Guideline: Keep helpers small and mostly side-effect-free.
   // ---------------------------------------------------------------------------
+  function getCellVariableLabel(r: number, c: number, cellVal: number | null): string {
+    if (!variablesMode || !session || !session.variables) {
+      return cellVal !== null ? String(cellVal) : '';
+    }
+    
+    for (const [varName, info] of Object.entries(session.variables)) {
+      const [r1, c1] = info.cell_1;
+      const [r2, c2] = info.cell_2;
+      if (r === r1 && c === c1) {
+        return cellVal !== null ? `${varName}=${cellVal}` : varName;
+      }
+      if (r === r2 && c === c2) {
+        if (info.offset === 0) {
+          return cellVal !== null ? `${varName}=${cellVal}` : varName;
+        }
+        const sign = info.offset >= 0 ? '+' : '-';
+        const absOffset = Math.abs(info.offset);
+        const formula = `${varName}${sign}${absOffset}`;
+        return cellVal !== null ? `${formula}=${cellVal}` : formula;
+      }
+    }
+    return cellVal !== null ? String(cellVal) : '';
+  }
   function inputAllowed() {
     return session?.status === 'typing';
   }
@@ -320,7 +345,8 @@
       magicSum: 34,
       solveTime: 0,
       showAnswer: false,
-      solution: null
+      solution: null,
+      variables: boardData.variables || null
     };
 
     saveGameState();
@@ -447,6 +473,51 @@
 
     const val = parseInt(key);
     if (val >= 1 && val <= 9) {
+      if (variablesMode && session.variables) {
+        let varNameFound = null;
+        let role = null;
+        let variableInfo = null;
+        
+        for (const [varName, info] of Object.entries(session.variables)) {
+          if (info.cell_1[0] === r && info.cell_1[1] === c) {
+            varNameFound = varName;
+            role = 'cell_1';
+            variableInfo = info;
+            break;
+          }
+          if (info.cell_2[0] === r && info.cell_2[1] === c) {
+            varNameFound = varName;
+            role = 'cell_2';
+            variableInfo = info;
+            break;
+          }
+        }
+
+        if (varNameFound && variableInfo) {
+          const offset = variableInfo.offset;
+          if (role === 'cell_1') {
+            const linkedVal = val + offset;
+            if (linkedVal < 1 || linkedVal > 9) {
+              const sign = offset >= 0 ? '+' : '-';
+              alert(`⚠️ Invalid: ${varNameFound}=${val} forces linked cell (${varNameFound}${sign}${Math.abs(offset)}) to ${linkedVal}, out of bounds [1-9]!`);
+              return;
+            }
+            session.grid[r][c].val = val;
+            session.grid[variableInfo.cell_2[0]][variableInfo.cell_2[1]].val = linkedVal;
+          } else {
+            const baseVal = val - offset;
+            if (baseVal < 1 || baseVal > 9) {
+              alert(`⚠️ Invalid: linked cell value ${val} forces base cell ${varNameFound} to ${baseVal}, out of bounds [1-9]!`);
+              return;
+            }
+            session.grid[variableInfo.cell_1[0]][variableInfo.cell_1[1]].val = baseVal;
+            session.grid[r][c].val = val;
+          }
+          saveGameState();
+          return;
+        }
+      }
+
       session.grid[r][c].val = val;
       saveGameState();
     }
@@ -456,6 +527,17 @@
     if (!session || !inputAllowed() || !selectedCell) return;
     const { r, c } = selectedCell;
     if (session.grid[r][c].isClue) return;
+
+    if (variablesMode && session.variables) {
+      for (const [varName, info] of Object.entries(session.variables)) {
+        if ((info.cell_1[0] === r && info.cell_1[1] === c) || (info.cell_2[0] === r && info.cell_2[1] === c)) {
+          session.grid[info.cell_1[0]][info.cell_1[1]].val = null;
+          session.grid[info.cell_2[0]][info.cell_2[1]].val = null;
+          saveGameState();
+          return;
+        }
+      }
+    }
 
     session.grid[r][c].val = null;
     saveGameState();
@@ -522,6 +604,10 @@
             <span class="info-badge timer">⏱️ {Math.floor(session.solveTime / 60)}:{(session.solveTime % 60) < 10 ? '0' : ''}{session.solveTime % 60}</span>
           {/if}
         </div>
+        <label class="variables-toggle-lbl" style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: #94a3b8; cursor: pointer; margin-top: 10px;">
+          <input type="checkbox" bind:checked={variablesMode} style="cursor: pointer;" />
+          🧮 Enable Variables Mode
+        </label>
       </div>
 
       <div class="board-wrapper">
@@ -542,7 +628,7 @@
                   class:selected={selectedCell?.r === rIdx && selectedCell?.c === cIdx}
                   onclick={() => handleCellClick(rIdx, cIdx)}
                 >
-                  {cell.val || ''}
+                  {cell.isClue ? cell.val : getCellVariableLabel(rIdx, cIdx, cell.val)}
                 </button>
               {/each}
               
@@ -561,6 +647,16 @@
           </div>
         </div>
       </div>
+
+      <!-- Virtual Number Pad -->
+      {#if selectedCell && session && session.status === 'typing'}
+        <div class="virtual-keyboard">
+          {#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as digit}
+            <button class="key-btn" onclick={() => handleKey(String(digit))}>{digit}</button>
+          {/each}
+          <button class="key-btn clear-btn" onclick={backspace}>✕</button>
+        </div>
+      {/if}
 
       <div class="controls-panel">
         {#if session.status === 'typing'}
@@ -902,5 +998,44 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .virtual-keyboard {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 15px;
+    background: #1e293b;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    margin-bottom: 15px;
+  }
+
+  .key-btn {
+    flex: 1;
+    height: 40px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #f1f5f9;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+  }
+
+  .key-btn:hover {
+    background: #1e293b;
+  }
+
+  .key-btn.clear-btn {
+    background: #ef4444;
+    border-color: #ef4444;
+  }
+
+  .key-btn.clear-btn:hover {
+    background: #dc2626;
   }
 </style>

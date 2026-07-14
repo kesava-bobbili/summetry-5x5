@@ -127,6 +127,51 @@ class SolutionCounter(cp_model.CpSolverSolutionCallback):
     def solutions(self):
         return self.__solutions
 
+def get_variables_for_board(puzzle, solution):
+    if puzzle is None or solution is None:
+        return {}
+    
+    empty_cells = [(r, c) for r in range(5) for c in range(5) if puzzle[r][c] is None]
+    paired_cells = set()
+    variables = {}
+    
+    var_names = ["x", "y", "z", "w", "p", "q"]
+    var_idx = 0
+    
+    for r, c in empty_cells:
+        if (r, c) in paired_cells:
+            continue
+            
+        mirrors = [
+            (r, 4 - c),
+            (4 - r, c),
+            (4 - r, 4 - c)
+        ]
+        
+        for mr, mc in mirrors:
+            if (mr, mc) == (r, c):
+                continue
+                
+            if puzzle[mr][mc] is None and (mr, mc) not in paired_cells:
+                var_name = var_names[var_idx % len(var_names)]
+                var_idx += 1
+                
+                v1 = solution[r][c]
+                v2 = solution[mr][mc]
+                offset = v2 - v1
+                
+                variables[var_name] = {
+                    "cell_1": [r, c],
+                    "cell_2": [mr, mc],
+                    "offset": offset
+                }
+                
+                paired_cells.add((r, c))
+                paired_cells.add((mr, mc))
+                break
+                
+    return variables
+
 # ==========================================
 # API Routes
 # ==========================================
@@ -139,7 +184,8 @@ def get_daily_board():
     return {
         "board_id": board["board_id"],
         "difficulty": board["difficulty"],
-        "puzzle": board["puzzle"]
+        "puzzle": board["puzzle"],
+        "variables": get_variables_for_board(board["puzzle"], board["solution"])
     }
 
 @app.get("/api/board/random")
@@ -150,7 +196,8 @@ def get_random_board():
     return {
         "board_id": board["board_id"],
         "difficulty": board["difficulty"],
-        "puzzle": board["puzzle"]
+        "puzzle": board["puzzle"],
+        "variables": get_variables_for_board(board["puzzle"], board["solution"])
     }
 
 @app.get("/api/board/{board_id}")
@@ -161,7 +208,8 @@ def get_board_by_id(board_id: str):
     return {
         "board_id": board["board_id"],
         "difficulty": board["difficulty"],
-        "puzzle": board["puzzle"]
+        "puzzle": board["puzzle"],
+        "variables": get_variables_for_board(board["puzzle"], board["solution"])
     }
 
 @app.get("/api/board/{board_id}/solution")
