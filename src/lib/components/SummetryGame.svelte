@@ -437,11 +437,23 @@
     storage.set(key, JSON.stringify(session));
   }
 
-  function restoreGameState() {
+  async function restoreGameState() {
     const key = mode === 'daily' ? todayKey() : PRACTICE_STATE_KEY;
     const savedData = storage.get(key);
     if (savedData) {
       session = JSON.parse(savedData);
+      
+      // Auto-migrate old saves to support variables on the fly:
+      if (session && session.variables === undefined) {
+        try {
+          const boardData = await apiRequest(`/api/board/${session.boardId}`);
+          session.variables = boardData.variables || null;
+          saveGameState();
+        } catch (err) {
+          console.error("Failed to migrate variables for old save:", err);
+        }
+      }
+
       if (timerInterval) clearInterval(timerInterval);
       if (session && session.status === 'typing') {
         timerInterval = setInterval(() => {
