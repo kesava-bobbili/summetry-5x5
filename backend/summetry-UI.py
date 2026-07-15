@@ -205,9 +205,16 @@ def init_board(board):
     st.session_state.selected    = None
     st.session_state.show_answer = False
     st.session_state.id_error    = ""
+    st.session_state.user_vars   = {}
+    st.session_state.var_values  = {"x": None, "y": None, "z": None}
 
 if "puzzle" not in st.session_state:
     init_board(random.choice(boards))
+
+if "user_vars" not in st.session_state:
+    st.session_state.user_vars = {}
+if "var_values" not in st.session_state:
+    st.session_state.var_values = {"x": None, "y": None, "z": None}
 
 puzzle      = st.session_state.puzzle
 solution    = st.session_state.solution
@@ -800,10 +807,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-var_map = {}
-if st.session_state.get("variables_mode", False):
-    var_map = get_variables_for_board(st.session_state.puzzle, st.session_state.solution)
-
 for r in range(size):
     cols = st.columns([1, 1, 1, 1, 1, 0.15, 1.4])
 
@@ -813,19 +816,23 @@ for r in range(size):
             if given is not None:
                 st.markdown(f"<div class='given'>{given}</div>", unsafe_allow_html=True)
             else:
-                val      = cell_values[r][c]
-                if var_map and (r, c) in var_map:
-                    info = var_map[(r, c)]
-                    if info["role"] == "cell_1" or info["offset"] == 0:
-                        label = f"{info['name']}"
-                    else:
-                        offset = info["offset"]
+                val = cell_values[r][c]
+                is_var = st.session_state.get("variables_mode", False) and (r, c) in st.session_state.user_vars
+                if is_var:
+                    var_info = st.session_state.user_vars[(r, c)]
+                    v_name = var_info["name"]
+                    offset = var_info["offset"]
+                    v_val = st.session_state.var_values.get(v_name)
+                    if v_val is not None:
+                        resolved = v_val + offset
                         sign = "+" if offset >= 0 else "-"
-                        label = f"{info['name']}{sign}{abs(offset)}"
-                    if val is not None:
-                        label += f"={val}"
+                        formula = f"{v_name}" if offset == 0 else f"{v_name}{sign}{abs(offset)}"
+                        label = f"{resolved} ({formula})"
+                    else:
+                        sign = "+" if offset >= 0 else "-"
+                        label = f"{v_name}" if offset == 0 else f"{v_name}{sign}{abs(offset)}"
                 else:
-                    label    = str(val) if val is not None else "·"
+                    label = str(val) if val is not None else "·"
                 
                 is_sel   = sel == (r, c)
                 if st.button(label, key=f"c{r}{c}", use_container_width=True,
@@ -872,13 +879,69 @@ st.markdown(
 # ============================
 if sel is not None:
     r, c = sel
-    var_info = var_map.get((r, c))
+    var_info = st.session_state.user_vars.get((r, c)) if st.session_state.get("variables_mode", False) else None
+
+    # Variable Configurator Panel
+    if st.session_state.get("variables_mode", False):
+        st.markdown("---")
+        st.markdown(f"**🧮 Variable Configurator for Cell ({r+1}, {c+1})**")
+        
+        # Row 1: Assign variable buttons
+        vc1, vc2, vc3, vc4 = st.columns(4)
+        current_var = var_info["name"] if var_info else None
+        
+        with vc1:
+            if st.button("Assign x", type="primary" if current_var == "x" else "secondary", key="assign_x_btn"):
+                st.session_state.user_vars[(r, c)] = {"name": "x", "offset": 0}
+                if st.session_state.var_values["x"] is not None:
+                    cell_values[r][c] = st.session_state.var_values["x"]
+                else:
+                    cell_values[r][c] = None
+                st.rerun()
+        with vc2:
+            if st.button("Assign y", type="primary" if current_var == "y" else "secondary", key="assign_y_btn"):
+                st.session_state.user_vars[(r, c)] = {"name": "y", "offset": 0}
+                if st.session_state.var_values["y"] is not None:
+                    cell_values[r][c] = st.session_state.var_values["y"]
+                else:
+                    cell_values[r][c] = None
+                st.rerun()
+        with vc3:
+            if st.button("Assign z", type="primary" if current_var == "z" else "secondary", key="assign_z_btn"):
+                st.session_state.user_vars[(r, c)] = {"name": "z", "offset": 0}
+                if st.session_state.var_values["z"] is not None:
+                    cell_values[r][c] = st.session_state.var_values["z"]
+                else:
+                    cell_values[r][c] = None
+                st.rerun()
+        with vc4:
+            if var_info:
+                if st.button("Remove Variable", type="primary", key="remove_var_btn"):
+                    del st.session_state.user_vars[(r, c)]
+                    cell_values[r][c] = None
+                    st.rerun()
+                    
+        # Row 2: Adjust Offset
+        if var_info:
+            st.markdown(f"Adjust Offset for **{current_var}**:")
+            offset_cols = st.columns(9)
+            offsets = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+            current_offset = var_info["offset"]
+            for idx, off in enumerate(offsets):
+                with offset_cols[idx]:
+                    lbl = f"+{off}" if off >= 0 else str(off)
+                    if st.button(lbl, key=f"off{off}", type="primary" if current_offset == off else "secondary"):
+                        st.session_state.user_vars[(r, c)]["offset"] = off
+                        if st.session_state.var_values[current_var] is not None:
+                            cell_values[r][c] = st.session_state.var_values[current_var] + off
+                        else:
+                            cell_values[r][c] = None
+                        st.rerun()
 
     if var_info:
         offset = var_info["offset"]
         sign = "+" if offset >= 0 else "-"
-        role = var_info["role"]
-        lbl_formula = f"{var_info['name']}" if (role == "cell_1" or offset == 0) else f"{var_info['name']}{sign}{abs(offset)}"
+        lbl_formula = f"{var_info['name']}" if offset == 0 else f"{var_info['name']}{sign}{abs(offset)}"
         st.markdown(f"**Variable Cell ({r+1}, {c+1}) [{lbl_formula}] →** pick value:")
     else:
         st.markdown(f"**Cell ({r+1}, {c+1}) →** pick a number or clear:")
@@ -888,21 +951,24 @@ if sel is not None:
         with pad_cols[i]:
             if st.button(str(digit), key=f"pad{digit}"):
                 if var_info:
-                    offset = var_info["offset"]
+                    var_name = var_info["name"]
                     base_val = digit - offset
                     
-                    # Validate all group cells remain within [1, 9]
+                    # Validate all cells linked to this variable stay within [1, 9]
                     invalid = False
-                    for gr, gc, o in var_info["all_cells"]:
-                        linked_val = base_val + o
-                        if not (1 <= linked_val <= 9):
-                            st.toast(f"⚠️ Invalid: {var_info['name']}={digit} forces cell ({gr+1}, {gc+1}) to {linked_val}, out of bounds [1-9]!")
-                            invalid = True
-                            break
-                            
+                    for (ri, ci), info in st.session_state.user_vars.items():
+                        if info["name"] == var_name:
+                            linked_val = base_val + info["offset"]
+                            if not (1 <= linked_val <= 9):
+                                st.toast(f"⚠️ Invalid: Setting {var_name}={base_val} forces cell ({ri+1}, {ci+1}) to {linked_val}, out of bounds [1-9]!")
+                                invalid = True
+                                break
+                                
                     if not invalid:
-                        for gr, gc, o in var_info["all_cells"]:
-                            cell_values[gr][gc] = base_val + o
+                        st.session_state.var_values[var_name] = base_val
+                        for (ri, ci), info in st.session_state.user_vars.items():
+                            if info["name"] == var_name:
+                                cell_values[ri][ci] = base_val + info["offset"]
                         st.session_state.selected = None
                         st.rerun()
                 else:
@@ -912,8 +978,11 @@ if sel is not None:
     with pad_cols[9]:
         if st.button("✕", key="pad_clear"):
             if var_info:
-                for gr, gc, _ in var_info["all_cells"]:
-                    cell_values[gr][gc] = None
+                var_name = var_info["name"]
+                st.session_state.var_values[var_name] = None
+                for (ri, ci), info in st.session_state.user_vars.items():
+                    if info["name"] == var_name:
+                        cell_values[ri][ci] = None
             else:
                 cell_values[r][c] = None
             st.session_state.selected = None

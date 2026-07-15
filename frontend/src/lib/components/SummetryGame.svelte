@@ -45,6 +45,8 @@
   interface Cell {
     val: number | null;
     isClue: boolean;
+    userVar?: 'x' | 'y' | 'z' | null;
+    userOffset?: number;
   }
 
   interface GameSession {
@@ -59,7 +61,7 @@
     solveTime: number; 
     showAnswer: boolean;
     solution: number[][] | null;
-    variables?: Record<string, { base_cell: [number, number], cells: Array<{ r: number, c: number, offset: number }> }> | null;
+    varValues?: Record<'x' | 'y' | 'z', number | null>;
   }
 
   interface Stats {
@@ -169,24 +171,27 @@
   // Guideline: Keep helpers small and mostly side-effect-free.
   // ---------------------------------------------------------------------------
   function getCellVariableLabel(r: number, c: number, cellVal: number | null): string {
-    if (!variablesMode || !session || !session.variables) {
-      return cellVal !== null ? String(cellVal) : '';
-    }
+    if (!session) return cellVal !== null ? String(cellVal) : '';
+    const cell = session.grid[r][c];
     
-    for (const [varName, group] of Object.entries(session.variables)) {
-      for (const cellInfo of group.cells) {
-        if (cellInfo.r === r && cellInfo.c === c) {
-          const offset = cellInfo.offset;
-          if (offset === 0) {
-            return cellVal !== null ? `${varName}=${cellVal}` : varName;
-          }
-          const sign = offset >= 0 ? '+' : '-';
-          const absOffset = Math.abs(offset);
-          const formula = `${varName}${sign}${absOffset}`;
-          return cellVal !== null ? `${formula}=${cellVal}` : formula;
+    if (variablesMode && cell.userVar) {
+      const varVal = session.varValues?.[cell.userVar];
+      if (varVal !== undefined && varVal !== null) {
+        // Variable has a numeric value assigned!
+        const resolvedVal = varVal + (cell.userOffset || 0);
+        return String(resolvedVal);
+      } else {
+        // Variable is NOT resolved yet, show the algebraic label (e.g., x, x+3)
+        const offset = cell.userOffset || 0;
+        if (offset === 0) {
+          return cell.userVar;
         }
+        const sign = offset >= 0 ? '+' : '-';
+        const absOffset = Math.abs(offset);
+        return `${cell.userVar}${sign}${absOffset}`;
       }
     }
+    
     return cellVal !== null ? String(cellVal) : '';
   }
   function inputAllowed() {
@@ -325,7 +330,9 @@
       for (let c = 0; c < 5; c++) {
         row.push({
           val: puzzle[r][c],
-          isClue: puzzle[r][c] !== null
+          isClue: puzzle[r][c] !== null,
+          userVar: null,
+          userOffset: 0
         });
       }
       sessionGrid.push(row);
@@ -344,7 +351,7 @@
       solveTime: 0,
       showAnswer: false,
       solution: null,
-      variables: boardData.variables || null
+      varValues: { x: null, y: null, z: null }
     };
 
     saveGameState();
@@ -450,14 +457,17 @@
     if (loadedSession) {
       session = loadedSession;
       
-      // Auto-migrate old saves to support variables on the fly:
-      if (session && session.variables === undefined) {
-        try {
-          const boardData = await apiRequest(`/api/board/${session.boardId}`);
-          session.variables = boardData.variables || null;
-          saveGameState();
-        } catch (err) {
-          console.error("Failed to migrate variables for old save:", err);
+      // Auto-migrate old saves to support user variables:
+      if (session) {
+        if (!session.varValues) {
+          session.varValues = { x: null, y: null, z: null };
+        }
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            const cell = session.grid[r][c];
+            if (cell.userVar === undefined) cell.userVar = null;
+            if (cell.userOffset === undefined) cell.userOffset = 0;
+          }
         }
       }
 
@@ -492,46 +502,47 @@
 
     const val = parseInt(key);
     if (val >= 1 && val <= 9) {
-      if (variablesMode && session.variables) {
-        let varNameFound = null;
-        let cellOffset = 0;
-        let groupInfo = null;
+      if (variablesMode && cell.userVar) {
+        const cellOffset = cell.userOffset || 0;
+        const varName = cell.userVar;
+        const varVal = val - cellOffset;
         
-        for (const [varName, group] of Object.entries(session.variables)) {
-          const match = group.cells.find(cell => cell.r === r && cell.c === c);
-          if (match) {
-            varNameFound = varName;
-            cellOffset = match.offset;
-            groupInfo = group;
-            break;
-          }
+        if (!session.varValues) {
+          session.varValues = { x: null, y: null, z: null };
         }
-
-        if (varNameFound && groupInfo) {
-          const baseVal = val - cellOffset;
-          
-          // Validate that all group cells remain within [1, 9]
-          for (const cellInfo of groupInfo.cells) {
-            const linkedVal = baseVal + cellInfo.offset;
-            if (linkedVal < 1 || linkedVal > 9) {
-              const sign = cellInfo.offset >= 0 ? '+' : '-';
-              const absO = Math.abs(cellInfo.offset);
-              const label = cellInfo.offset === 0 ? varNameFound : `${varNameFound}${sign}${absO}`;
-              alert(`⚠️ Invalid: Setting this cell to ${val} forces cell (${cellInfo.r+1}, ${cellInfo.c+1}) [${label}] to ${linkedVal}, out of bounds [1-9]!`);
-              return;
+        
+        // Validate all other cells using this variable
+        for (let ri = 0; ri < 5; ri++) {
+          for (let ci = 0; ci < 5; ci++) {
+            const other = session.grid[ri][ci];
+            if (other.userVar === varName) {
+              const linkedVal = varVal + (other.userOffset || 0);
+              if (linkedVal < 1 || linkedVal > 9) {
+                const sign = (other.userOffset || 0) >= 0 ? '+' : '-';
+                const absO = Math.abs(other.userOffset || 0);
+                const label = other.userOffset === 0 ? varName : `${varName}${sign}${absO}`;
+                alert(`⚠️ Invalid: Setting this cell to ${val} forces cell (${ri+1}, ${ci+1}) [${label}] to ${linkedVal}, out of bounds [1-9]!`);
+                return;
+              }
             }
           }
-          
-          // Apply values to all group cells
-          for (const cellInfo of groupInfo.cells) {
-            session.grid[cellInfo.r][cellInfo.c].val = baseVal + cellInfo.offset;
-          }
-          saveGameState();
-          return;
         }
+        
+        // Apply values to all matching variable cells
+        session.varValues[varName] = varVal;
+        for (let ri = 0; ri < 5; ri++) {
+          for (let ci = 0; ci < 5; ci++) {
+            const other = session.grid[ri][ci];
+            if (other.userVar === varName) {
+              other.val = varVal + (other.userOffset || 0);
+            }
+          }
+        }
+        saveGameState();
+        return;
       }
 
-      session.grid[r][c].val = val;
+      cell.val = val;
       saveGameState();
     }
   }
@@ -539,22 +550,85 @@
   function backspace() {
     if (!session || !inputAllowed() || !selectedCell) return;
     const { r, c } = selectedCell;
-    if (session.grid[r][c].isClue) return;
+    const cell = session.grid[r][c];
+    if (cell.isClue) return;
 
-    if (variablesMode && session.variables) {
-      for (const [varName, group] of Object.entries(session.variables)) {
-        const match = group.cells.find(cell => cell.r === r && cell.c === c);
-        if (match) {
-          for (const cellInfo of group.cells) {
-            session.grid[cellInfo.r][cellInfo.c].val = null;
+    if (variablesMode && cell.userVar) {
+      const varName = cell.userVar;
+      if (session.varValues) {
+        session.varValues[varName] = null;
+      }
+      for (let ri = 0; ri < 5; ri++) {
+        for (let ci = 0; ci < 5; ci++) {
+          const other = session.grid[ri][ci];
+          if (other.userVar === varName) {
+            other.val = null;
           }
-          saveGameState();
-          return;
         }
       }
+      saveGameState();
+      return;
     }
 
+    cell.val = null;
+    saveGameState();
+  }
+
+  function assignCellVariable(vName: 'x' | 'y' | 'z') {
+    if (!session || !selectedCell) return;
+    const { r, c } = selectedCell;
+    if (session.grid[r][c].isClue) return;
+    
+    session.grid[r][c].userVar = vName;
+    session.grid[r][c].userOffset = 0;
+    
+    if (!session.varValues) {
+      session.varValues = { x: null, y: null, z: null };
+    }
+    
+    // If the variable already has a value, sync it!
+    const varVal = session.varValues[vName];
+    if (varVal !== null) {
+      session.grid[r][c].val = varVal;
+    } else {
+      session.grid[r][c].val = null;
+    }
+    
+    saveGameState();
+  }
+
+  function clearCellVariable() {
+    if (!session || !selectedCell) return;
+    const { r, c } = selectedCell;
+    if (session.grid[r][c].isClue) return;
+    
+    session.grid[r][c].userVar = null;
+    session.grid[r][c].userOffset = 0;
     session.grid[r][c].val = null;
+    
+    saveGameState();
+  }
+
+  function assignCellOffset(offsetVal: number) {
+    if (!session || !selectedCell) return;
+    const { r, c } = selectedCell;
+    const cell = session.grid[r][c];
+    if (cell.isClue || !cell.userVar) return;
+    
+    cell.userOffset = offsetVal;
+    
+    if (!session.varValues) {
+      session.varValues = { x: null, y: null, z: null };
+    }
+    
+    // If the variable has a value, sync it!
+    const varVal = session.varValues[cell.userVar];
+    if (varVal !== null) {
+      cell.val = varVal + offsetVal;
+    } else {
+      cell.val = null;
+    }
+    
     saveGameState();
   }
 
@@ -641,9 +715,17 @@
                   class="grid-cell"
                   class:clue={cell.isClue}
                   class:selected={selectedCell?.r === rIdx && selectedCell?.c === cIdx}
+                  class:variable={variablesMode && cell.userVar}
                   onclick={() => handleCellClick(rIdx, cIdx)}
                 >
-                  {cell.isClue ? cell.val : getCellVariableLabel(rIdx, cIdx, cell.val)}
+                  <span class="cell-main-text">
+                    {cell.isClue ? cell.val : getCellVariableLabel(rIdx, cIdx, cell.val)}
+                  </span>
+                  {#if variablesMode && cell.userVar}
+                    <span class="cell-sub-text">
+                      {cell.userVar}{cell.userOffset !== 0 ? (cell.userOffset > 0 ? '+' + cell.userOffset : cell.userOffset) : ''}
+                    </span>
+                  {/if}
                 </button>
               {/each}
               
@@ -670,6 +752,50 @@
             <button class="key-btn" onclick={() => handleKey(String(digit))}>{digit}</button>
           {/each}
           <button class="key-btn clear-btn" onclick={backspace}>✕</button>
+        </div>
+      {/if}
+
+      <!-- Variable Assignment Panel -->
+      {#if selectedCell && session && session.status === 'typing' && variablesMode && !session.grid[selectedCell.r][selectedCell.c].isClue}
+        <div class="variable-assign-panel" style="display: flex; flex-direction: column; gap: 8px; background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 8px; margin-top: 10px; margin-bottom: 15px;">
+          <div style="font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-align: center;">🧮 Assign Variable to Cell ({selectedCell.r+1}, {selectedCell.c+1})</div>
+          <div class="var-btn-row" style="display: flex; gap: 6px; justify-content: center;">
+            {#each ['x', 'y', 'z'] as vName}
+              <button 
+                class="var-assign-btn" 
+                class:active={session.grid[selectedCell!.r][selectedCell!.c].userVar === vName}
+                style="flex: 1; padding: 8px; font-weight: 700; background: {session.grid[selectedCell!.r][selectedCell!.c].userVar === vName ? '#2563eb' : '#0f172a'}; border: 1px solid #334155; color: #f1f5f9; border-radius: 6px; cursor: pointer;"
+                onclick={() => assignCellVariable(vName as 'x'|'y'|'z')}
+              >
+                Assign {vName}
+              </button>
+            {/each}
+            {#if session.grid[selectedCell.r][selectedCell.c].userVar}
+              <button 
+                class="var-assign-btn clear-var-btn" 
+                style="flex: 1; padding: 8px; font-weight: 700; background: #ef4444; border: 1px solid #ef4444; color: white; border-radius: 6px; cursor: pointer;"
+                onclick={clearCellVariable}
+              >
+                Remove
+              </button>
+            {/if}
+          </div>
+          
+          {#if session.grid[selectedCell.r][selectedCell.c].userVar}
+            <div style="font-size: 0.8rem; font-weight: 600; color: #64748b; text-align: center; margin-top: 4px;">Adjust Offset for {session.grid[selectedCell.r][selectedCell.c].userVar}:</div>
+            <div class="offset-btn-row" style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+              {#each [-4, -3, -2, -1, 0, 1, 2, 3, 4] as offsetVal}
+                <button 
+                  class="offset-btn"
+                  class:active={session.grid[selectedCell!.r][selectedCell!.c].userOffset === offsetVal}
+                  style="padding: 6px 10px; font-size: 0.8rem; font-weight: 700; background: {session.grid[selectedCell!.r][selectedCell!.c].userOffset === offsetVal ? '#10b981' : '#0f172a'}; border: 1px solid #334155; color: #f1f5f9; border-radius: 4px; cursor: pointer;"
+                  onclick={() => assignCellOffset(offsetVal)}
+                >
+                  {offsetVal >= 0 ? '+' : ''}{offsetVal}
+                </button>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -1052,5 +1178,29 @@
 
   .key-btn.clear-btn:hover {
     background: #dc2626;
+  }
+
+  /* Interactive Variables Styling */
+  .grid-cell.variable {
+    background: #1e3a8a !important; /* Elegant dark blue for variables */
+    border-color: #3b82f6 !important;
+  }
+
+  .grid-cell.variable.selected {
+    background: #2563eb !important;
+  }
+
+  .grid-cell {
+    position: relative;
+  }
+
+  .cell-sub-text {
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    font-size: 0.65rem;
+    color: #93c5fd;
+    font-weight: 600;
+    pointer-events: none;
   }
 </style>
