@@ -59,7 +59,7 @@
     solveTime: number; 
     showAnswer: boolean;
     solution: number[][] | null;
-    variables?: Record<string, { cell_1: [number, number], cell_2: [number, number], offset: number }> | null;
+    variables?: Record<string, { base_cell: [number, number], cells: Array<{ r: number, c: number, offset: number }> }> | null;
   }
 
   interface Stats {
@@ -173,20 +173,18 @@
       return cellVal !== null ? String(cellVal) : '';
     }
     
-    for (const [varName, info] of Object.entries(session.variables)) {
-      const [r1, c1] = info.cell_1;
-      const [r2, c2] = info.cell_2;
-      if (r === r1 && c === c1) {
-        return cellVal !== null ? `${varName}=${cellVal}` : varName;
-      }
-      if (r === r2 && c === c2) {
-        if (info.offset === 0) {
-          return cellVal !== null ? `${varName}=${cellVal}` : varName;
+    for (const [varName, group] of Object.entries(session.variables)) {
+      for (const cellInfo of group.cells) {
+        if (cellInfo.r === r && cellInfo.c === c) {
+          const offset = cellInfo.offset;
+          if (offset === 0) {
+            return cellVal !== null ? `${varName}=${cellVal}` : varName;
+          }
+          const sign = offset >= 0 ? '+' : '-';
+          const absOffset = Math.abs(offset);
+          const formula = `${varName}${sign}${absOffset}`;
+          return cellVal !== null ? `${formula}=${cellVal}` : formula;
         }
-        const sign = info.offset >= 0 ? '+' : '-';
-        const absOffset = Math.abs(info.offset);
-        const formula = `${varName}${sign}${absOffset}`;
-        return cellVal !== null ? `${formula}=${cellVal}` : formula;
       }
     }
     return cellVal !== null ? String(cellVal) : '';
@@ -496,43 +494,37 @@
     if (val >= 1 && val <= 9) {
       if (variablesMode && session.variables) {
         let varNameFound = null;
-        let role = null;
-        let variableInfo = null;
+        let cellOffset = 0;
+        let groupInfo = null;
         
-        for (const [varName, info] of Object.entries(session.variables)) {
-          if (info.cell_1[0] === r && info.cell_1[1] === c) {
+        for (const [varName, group] of Object.entries(session.variables)) {
+          const match = group.cells.find(cell => cell.r === r && cell.c === c);
+          if (match) {
             varNameFound = varName;
-            role = 'cell_1';
-            variableInfo = info;
-            break;
-          }
-          if (info.cell_2[0] === r && info.cell_2[1] === c) {
-            varNameFound = varName;
-            role = 'cell_2';
-            variableInfo = info;
+            cellOffset = match.offset;
+            groupInfo = group;
             break;
           }
         }
 
-        if (varNameFound && variableInfo) {
-          const offset = variableInfo.offset;
-          if (role === 'cell_1') {
-            const linkedVal = val + offset;
+        if (varNameFound && groupInfo) {
+          const baseVal = val - cellOffset;
+          
+          // Validate that all group cells remain within [1, 9]
+          for (const cellInfo of groupInfo.cells) {
+            const linkedVal = baseVal + cellInfo.offset;
             if (linkedVal < 1 || linkedVal > 9) {
-              const sign = offset >= 0 ? '+' : '-';
-              alert(`⚠️ Invalid: ${varNameFound}=${val} forces linked cell (${varNameFound}${sign}${Math.abs(offset)}) to ${linkedVal}, out of bounds [1-9]!`);
+              const sign = cellInfo.offset >= 0 ? '+' : '-';
+              const absO = Math.abs(cellInfo.offset);
+              const label = cellInfo.offset === 0 ? varNameFound : `${varNameFound}${sign}${absO}`;
+              alert(`⚠️ Invalid: Setting this cell to ${val} forces cell (${cellInfo.r+1}, ${cellInfo.c+1}) [${label}] to ${linkedVal}, out of bounds [1-9]!`);
               return;
             }
-            session.grid[r][c].val = val;
-            session.grid[variableInfo.cell_2[0]][variableInfo.cell_2[1]].val = linkedVal;
-          } else {
-            const baseVal = val - offset;
-            if (baseVal < 1 || baseVal > 9) {
-              alert(`⚠️ Invalid: linked cell value ${val} forces base cell ${varNameFound} to ${baseVal}, out of bounds [1-9]!`);
-              return;
-            }
-            session.grid[variableInfo.cell_1[0]][variableInfo.cell_1[1]].val = baseVal;
-            session.grid[r][c].val = val;
+          }
+          
+          // Apply values to all group cells
+          for (const cellInfo of groupInfo.cells) {
+            session.grid[cellInfo.r][cellInfo.c].val = baseVal + cellInfo.offset;
           }
           saveGameState();
           return;
@@ -550,10 +542,12 @@
     if (session.grid[r][c].isClue) return;
 
     if (variablesMode && session.variables) {
-      for (const [varName, info] of Object.entries(session.variables)) {
-        if ((info.cell_1[0] === r && info.cell_1[1] === c) || (info.cell_2[0] === r && info.cell_2[1] === c)) {
-          session.grid[info.cell_1[0]][info.cell_1[1]].val = null;
-          session.grid[info.cell_2[0]][info.cell_2[1]].val = null;
+      for (const [varName, group] of Object.entries(session.variables)) {
+        const match = group.cells.find(cell => cell.r === r && cell.c === c);
+        if (match) {
+          for (const cellInfo of group.cells) {
+            session.grid[cellInfo.r][cellInfo.c].val = null;
+          }
           saveGameState();
           return;
         }

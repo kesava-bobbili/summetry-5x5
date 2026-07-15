@@ -121,56 +121,56 @@ def get_variables_for_board(puzzle, solution):
     if puzzle is None or solution is None:
         return {}
     
-    # Identify all empty cells
     empty_cells = [(r, c) for r in range(5) for c in range(5) if puzzle[r][c] is None]
-    paired_cells = set()
+    processed_cells = set()
     variables_map = {}
     
-    # Available variable names
     var_names = ["x", "y", "z", "w", "p", "q"]
     var_idx = 0
     
     for r, c in empty_cells:
-        if (r, c) in paired_cells:
+        if (r, c) in processed_cells:
             continue
             
-        # Possible mirror candidates:
-        mirrors = [
-            (r, 4 - c),       # Horizontal reflection
-            (4 - r, c),       # Vertical reflection
-            (4 - r, 4 - c),   # Central rotation reflection
+        # Get all symmetric coordinates for this cell
+        symmetry_group = {
+            (r, c),
+            (r, 4 - c),
+            (4 - r, c),
+            (4 - r, 4 - c)
+        }
+        
+        # Keep only the ones that are actually empty (and not already processed)
+        group_empty_cells = [
+            (gr, gc) for gr, gc in symmetry_group 
+            if puzzle[gr][gc] is None and (gr, gc) not in processed_cells
         ]
         
-        for mr, mc in mirrors:
-            if (mr, mc) == (r, c):
-                continue # Skip self-mirror (e.g. center cell)
+        if len(group_empty_cells) >= 2:
+            var_name = var_names[var_idx % len(var_names)]
+            var_idx += 1
+            
+            group_empty_cells.sort()
+            base_r, base_c = group_empty_cells[0]
+            base_val = solution[base_r][base_c]
+            
+            # Prepare all cells in the group
+            group_info_list = []
+            for gr, gc in group_empty_cells:
+                offset = solution[gr][gc] - base_val
+                group_info_list.append((gr, gc, offset))
                 
-            # If the mirror cell is also empty and not yet paired
-            if puzzle[mr][mc] is None and (mr, mc) not in paired_cells:
-                # Pair them up!
-                var_name = var_names[var_idx % len(var_names)]
-                var_idx += 1
-                
-                v1 = solution[r][c]
-                v2 = solution[mr][mc]
-                offset = v2 - v1
-                
-                variables_map[(r, c)] = {
+            for gr, gc in group_empty_cells:
+                offset = solution[gr][gc] - base_val
+                role = "cell_1" if (gr, gc) == (base_r, base_c) else "cell_2"
+                variables_map[(gr, gc)] = {
                     "name": var_name,
-                    "role": "cell_1",
+                    "role": role,
                     "offset": offset,
-                    "partner": (mr, mc)
+                    "partner": (base_r, base_c),
+                    "all_cells": group_info_list
                 }
-                variables_map[(mr, mc)] = {
-                    "name": var_name,
-                    "role": "cell_2",
-                    "offset": offset,
-                    "partner": (r, c)
-                }
-                
-                paired_cells.add((r, c))
-                paired_cells.add((mr, mc))
-                break
+                processed_cells.add((gr, gc))
                 
     return variables_map
 
@@ -888,29 +888,23 @@ if sel is not None:
         with pad_cols[i]:
             if st.button(str(digit), key=f"pad{digit}"):
                 if var_info:
-                    role = var_info["role"]
                     offset = var_info["offset"]
-                    sign = "+" if offset >= 0 else "-"
-                    partner_r, partner_c = var_info["partner"]
+                    base_val = digit - offset
                     
-                    if role == "cell_1":
-                        linked_val = digit + offset
+                    # Validate all group cells remain within [1, 9]
+                    invalid = False
+                    for gr, gc, o in var_info["all_cells"]:
+                        linked_val = base_val + o
                         if not (1 <= linked_val <= 9):
-                            st.toast(f"⚠️ Invalid: {var_info['name']}={digit} forces linked cell ({var_info['name']}{sign}{abs(offset)}) to {linked_val}, out of bounds [1-9]!")
-                        else:
-                            cell_values[r][c] = digit
-                            cell_values[partner_r][partner_c] = linked_val
-                            st.session_state.selected = None
-                            st.rerun()
-                    else:  # role == "cell_2"
-                        base_val = digit - offset
-                        if not (1 <= base_val <= 9):
-                            st.toast(f"⚠️ Invalid: linked cell value {digit} forces base cell {var_info['name']} to {base_val}, out of bounds [1-9]!")
-                        else:
-                            cell_values[partner_r][partner_c] = base_val
-                            cell_values[r][c] = digit
-                            st.session_state.selected = None
-                            st.rerun()
+                            st.toast(f"⚠️ Invalid: {var_info['name']}={digit} forces cell ({gr+1}, {gc+1}) to {linked_val}, out of bounds [1-9]!")
+                            invalid = True
+                            break
+                            
+                    if not invalid:
+                        for gr, gc, o in var_info["all_cells"]:
+                            cell_values[gr][gc] = base_val + o
+                        st.session_state.selected = None
+                        st.rerun()
                 else:
                     cell_values[r][c] = digit
                     st.session_state.selected = None
@@ -918,9 +912,8 @@ if sel is not None:
     with pad_cols[9]:
         if st.button("✕", key="pad_clear"):
             if var_info:
-                partner_r, partner_c = var_info["partner"]
-                cell_values[r][c] = None
-                cell_values[partner_r][partner_c] = None
+                for gr, gc, _ in var_info["all_cells"]:
+                    cell_values[gr][gc] = None
             else:
                 cell_values[r][c] = None
             st.session_state.selected = None

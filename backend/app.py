@@ -135,43 +135,51 @@ def get_variables_for_board(puzzle, solution):
         return {}
     
     empty_cells = [(r, c) for r in range(5) for c in range(5) if puzzle[r][c] is None]
-    paired_cells = set()
+    processed_cells = set()
     variables = {}
     
     var_names = ["x", "y", "z", "w", "p", "q"]
     var_idx = 0
     
     for r, c in empty_cells:
-        if (r, c) in paired_cells:
+        if (r, c) in processed_cells:
             continue
             
-        mirrors = [
+        # Get all symmetric coordinates for this cell
+        symmetry_group = {
+            (r, c),
             (r, 4 - c),
             (4 - r, c),
             (4 - r, 4 - c)
+        }
+        
+        # Keep only the ones that are actually empty (and not already processed)
+        group_empty_cells = [
+            (gr, gc) for gr, gc in symmetry_group 
+            if puzzle[gr][gc] is None and (gr, gc) not in processed_cells
         ]
         
-        for mr, mc in mirrors:
-            if (mr, mc) == (r, c):
-                continue
-                
-            if puzzle[mr][mc] is None and (mr, mc) not in paired_cells:
-                var_name = var_names[var_idx % len(var_names)]
-                var_idx += 1
-                
-                v1 = solution[r][c]
-                v2 = solution[mr][mc]
-                offset = v2 - v1
-                
-                variables[var_name] = {
-                    "cell_1": [r, c],
-                    "cell_2": [mr, mc],
+        if len(group_empty_cells) >= 2:
+            var_name = var_names[var_idx % len(var_names)]
+            var_idx += 1
+            
+            group_empty_cells.sort()
+            base_r, base_c = group_empty_cells[0]
+            base_val = solution[base_r][base_c]
+            
+            variables[var_name] = {
+                "base_cell": [base_r, base_c],
+                "cells": []
+            }
+            
+            for gr, gc in group_empty_cells:
+                offset = solution[gr][gc] - base_val
+                variables[var_name]["cells"].append({
+                    "r": gr,
+                    "c": gc,
                     "offset": offset
-                }
-                
-                paired_cells.add((r, c))
-                paired_cells.add((mr, mc))
-                break
+                })
+                processed_cells.add((gr, gc))
                 
     return variables
 
