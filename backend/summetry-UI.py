@@ -691,7 +691,34 @@ def on_board_change():
 with st.sidebar:
     st.header("Load Board")
 
-    st.checkbox("🧮 Enable Variables Mode", key="variables_mode")
+    if st.checkbox("🧮 Enable Variables Mode", key="variables_mode"):
+        st.subheader("Set Variable Values")
+        sb_cols = st.columns(3)
+        for idx, vName in enumerate(["x", "y", "z"]):
+            with sb_cols[idx]:
+                current_val = st.session_state.var_values[vName]
+                options = ["?"] + [str(n) for n in range(1, 10)]
+                sel_idx = options.index(str(current_val)) if current_val is not None else 0
+                sel_val = st.selectbox(f"{vName.upper()} =", options, index=sel_idx, key=f"sb_val_{vName}")
+                
+                new_val = None if sel_val == "?" else int(sel_val)
+                if new_val != current_val:
+                    # Validate bounds for all linked cells
+                    invalid = False
+                    if new_val is not None:
+                        for (ri, ci), info in st.session_state.user_vars.items():
+                            if info["name"] == vName:
+                                linked_val = new_val + info["offset"]
+                                if not (1 <= linked_val <= 9):
+                                    st.sidebar.error(f"⚠️ Invalid bounds!")
+                                    invalid = True
+                                    break
+                    if not invalid:
+                        st.session_state.var_values[vName] = new_val
+                        for (ri, ci), info in st.session_state.user_vars.items():
+                            if info["name"] == vName:
+                                cell_values[ri][ci] = new_val + info["offset"] if new_val is not None else None
+                        st.rerun()
 
     st.subheader("Filter by Difficulty")
     diff_options = ["All", "Easy", "Medium", "Hard"]

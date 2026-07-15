@@ -632,6 +632,59 @@
     saveGameState();
   }
 
+  function setVariableValue(vName: 'x' | 'y' | 'z', valueStr: string) {
+    if (!session) return;
+    if (!session.varValues) {
+      session.varValues = { x: null, y: null, z: null };
+    }
+    
+    if (valueStr === "") {
+      session.varValues[vName] = null;
+      // Clear all cells that are bound to this variable
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          const cell = session.grid[r][c];
+          if (cell.userVar === vName) {
+            cell.val = null;
+          }
+        }
+      }
+      saveGameState();
+      return;
+    }
+    
+    const val = parseInt(valueStr);
+    
+    // Validate all cells containing this variable stay in bounds [1, 9]
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const cell = session.grid[r][c];
+        if (cell.userVar === vName) {
+          const linkedVal = val + (cell.userOffset || 0);
+          if (linkedVal < 1 || linkedVal > 9) {
+            const sign = (cell.userOffset || 0) >= 0 ? '+' : '-';
+            const absO = Math.abs(cell.userOffset || 0);
+            const label = cell.userOffset === 0 ? vName : `${vName}${sign}${absO}`;
+            alert(`⚠️ Invalid: Setting ${vName}=${val} forces cell (${r+1}, ${c+1}) [${label}] to {linkedVal}, out of bounds [1-9]!`);
+            return;
+          }
+        }
+      }
+    }
+    
+    // Apply the values
+    session.varValues[vName] = val;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const cell = session.grid[r][c];
+        if (cell.userVar === vName) {
+          cell.val = val + (cell.userOffset || 0);
+        }
+      }
+    }
+    saveGameState();
+  }
+
   function handlePhysicalKey(event: KeyboardEvent) {
     if (!session || !inputAllowed()) return;
     
@@ -697,6 +750,27 @@
           <input type="checkbox" bind:checked={variablesMode} style="cursor: pointer;" />
           🧮 Enable Variables Mode
         </label>
+        
+        {#if variablesMode}
+          <div class="variable-values-panel" style="display: flex; gap: 12px; margin-top: 12px; background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid #1e293b; align-items: center; justify-content: center; flex-wrap: wrap;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: #94a3b8;">Set Variable Values:</span>
+            {#each ['x', 'y', 'z'] as vName}
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-weight: 700; color: #60a5fa; font-size: 0.9rem; text-transform: uppercase;">{vName} =</span>
+                <select 
+                  value={session.varValues?.[vName as 'x'|'y'|'z'] || ''} 
+                  style="background: #1e293b; color: white; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.9rem; cursor: pointer;"
+                  onchange={(e) => setVariableValue(vName as 'x'|'y'|'z', (e.target as HTMLSelectElement).value)}
+                >
+                  <option value="">?</option>
+                  {#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as num}
+                    <option value={num}>{num}</option>
+                  {/each}
+                </select>
+              </div>
+            {/each}
+          </div>
+        {/if}
       </div>
 
       <div class="board-wrapper">
