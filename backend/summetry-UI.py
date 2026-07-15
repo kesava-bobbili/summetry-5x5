@@ -249,55 +249,60 @@ diag_sums = [line_sum(l) for l in diags_l]
 # ============================
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
+/* Global Font Override */
+.stApp {
+    font-family: 'Outfit', sans-serif !important;
+}
+
+/* Custom Given Cell design */
 .given {
-    width:52px; height:52px;
+    width:54px; height:54px;
     display:flex; align-items:center; justify-content:center;
     font-size:22px; font-weight:700;
-    background:#1e293b; color:#f1f5f9;
-    border-radius:8px; margin:1px;
+    background:rgba(15, 23, 42, 0.85); color:#f8fafc;
+    border-radius:12px; margin:1px;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.03);
 }
-.sum-live { font-size:12px; color:#64748b; }
-.sum-done { font-size:13px; font-weight:700; color:#22c55e; }
+
+/* Premium Sum Guides */
+.sum-live { font-size:12px; font-weight: 500; color:#64748b; }
+.sum-done { font-size:13px; font-weight:800; color:#10b981; text-shadow: 0 0 10px rgba(16, 185, 129, 0.3); }
+
+/* Badge and Meta layout */
 .board-id-box {
     font-family: monospace; font-size: 12px;
-    background: #1e293b; color: #94a3b8;
-    border-radius: 6px; padding: 6px 12px;
+    background: rgba(30, 41, 59, 0.5); color: #94a3b8;
+    border-radius: 8px; padding: 6px 12px;
     display: inline-block; margin-bottom: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
 }
-.note-card {
-    background: #1e293b;
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
-}
-.note-meta {
-    font-size: 11px;
-    color: #64748b;
-    margin-bottom: 4px;
-}
-.note-author {
-    color: #38bdf8;
-    font-weight: 600;
-}
-.note-text {
-    font-size: 14px;
-    color: #e2e8f0;
-}
+
 .diff-badge {
     font-size: 11px;
     font-weight: 700;
-    border-radius: 12px;
-    padding: 3px 10px;
+    border-radius: 8px;
+    padding: 4px 12px;
     display: inline-block;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    font-family: sans-serif;
     margin-bottom: 4px;
 }
-.diff-easy { background: #065f46; color: #a7f3d0; border: 1px solid #047857; }
-.diff-medium { background: #78350f; color: #fef3c7; border: 1px solid #b45309; }
-.diff-hard { background: #7f1d1d; color: #fee2e2; border: 1px solid #b91c1c; }
+.diff-easy { background: rgba(6, 95, 70, 0.2); color: #a7f3d0; border: 1px solid rgba(52, 211, 153, 0.15); }
+.diff-medium { background: rgba(120, 53, 15, 0.2); color: #fef3c7; border: 1px solid rgba(245, 158, 11, 0.15); }
+.diff-hard { background: rgba(127, 29, 29, 0.2); color: #fee2e2; border: 1px solid rgba(239, 68, 68, 0.15); }
+
+/* Horizontal container padding */
 [data-testid="stHorizontalBlock"] > div { padding:0 2px !important; }
+
+/* Custom Button Styling */
+button {
+    border-radius: 12px !important;
+    font-family: 'Outfit', sans-serif !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
