@@ -35,8 +35,11 @@ def get_sheet():
 # ============================
 # Load boards
 # ============================
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 def load_boards():
-    with open("magic_boards2.json", "r") as f:
+    filepath = os.path.join(BASE_DIR, "data", "magic_boards2.json")
+    with open(filepath, "r") as f:
         data = json.load(f)
     for idx, b in enumerate(data):
         b["blanks"] = sum(row.count(None) for row in b["puzzle"])
@@ -46,7 +49,8 @@ def load_boards():
 
 def load_boards_300():
     try:
-        with open("magic_boards_300.json", "r") as f:
+        filepath = os.path.join(BASE_DIR, "data", "magic_boards_300.json")
+        with open(filepath, "r") as f:
             data = json.load(f)
         for b in data:
             b["blanks"] = sum(row.count(None) for row in b["puzzle"])
@@ -61,7 +65,7 @@ boards_300, boards_300_by_id = load_boards_300()
 # ============================
 # Notes helpers
 # ============================
-LOCAL_FEEDBACK_FILE = "feedback.json"
+LOCAL_FEEDBACK_FILE = os.path.join(BASE_DIR, "data", "feedback.json")
 
 def load_notes():
     if not NOTES_ENABLED:

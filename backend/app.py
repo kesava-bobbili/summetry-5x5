@@ -35,8 +35,9 @@ def load_boards(filename):
     return data
 
 # Load datasets on startup
-boards = load_boards("magic_boards2.json")
-boards_300 = load_boards("magic_boards_300.json")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+boards = load_boards(os.path.join(BASE_DIR, "data", "magic_boards2.json"))
+boards_300 = load_boards(os.path.join(BASE_DIR, "data", "magic_boards_300.json"))
 
 # Build unified fast-lookup dictionary
 boards_by_id = {b["board_id"]: b for b in boards}
