@@ -35,7 +35,9 @@ def load_boards(filename):
     return data
 
 # Load datasets on startup
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Locate project root folder containing 'data'
+_curr = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = _curr if os.path.exists(os.path.join(_curr, "data")) else os.path.dirname(_curr)
 boards = load_boards(os.path.join(BASE_DIR, "data", "magic_boards2.json"))
 boards_300 = load_boards(os.path.join(BASE_DIR, "data", "magic_boards_300.json"))
 
