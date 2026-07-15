@@ -951,11 +951,27 @@ if sel is not None:
         # Row 2: Adjust Offset
         if var_info:
             st.markdown(f"Adjust Offset for **{current_var}**:")
-            offset_cols = st.columns(9)
-            offsets = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
             current_offset = var_info["offset"]
-            for idx, off in enumerate(offsets):
-                with offset_cols[idx]:
+            
+            # Row A: Negative Offsets (-8 to -1)
+            offsets_row1 = [-8, -7, -6, -5, -4, -3, -2, -1]
+            offset_cols1 = st.columns(len(offsets_row1))
+            for idx, off in enumerate(offsets_row1):
+                with offset_cols1[idx]:
+                    lbl = str(off)
+                    if st.button(lbl, key=f"off{off}", type="primary" if current_offset == off else "secondary"):
+                        st.session_state.user_vars[(r, c)]["offset"] = off
+                        if st.session_state.var_values[current_var] is not None:
+                            cell_values[r][c] = st.session_state.var_values[current_var] + off
+                        else:
+                            cell_values[r][c] = None
+                        st.rerun()
+            
+            # Row B: Non-Negative Offsets (0 to +8)
+            offsets_row2 = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            offset_cols2 = st.columns(len(offsets_row2))
+            for idx, off in enumerate(offsets_row2):
+                with offset_cols2[idx]:
                     lbl = f"+{off}" if off >= 0 else str(off)
                     if st.button(lbl, key=f"off{off}", type="primary" if current_offset == off else "secondary"):
                         st.session_state.user_vars[(r, c)]["offset"] = off
