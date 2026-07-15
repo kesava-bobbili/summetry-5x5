@@ -993,6 +993,7 @@ if sel is not None:
                                 
                     if not invalid:
                         st.session_state.var_values[var_name] = base_val
+                        st.session_state[f"sb_val_{var_name}"] = str(base_val)
                         for (ri, ci), info in st.session_state.user_vars.items():
                             if info["name"] == var_name:
                                 cell_values[ri][ci] = base_val + info["offset"]
@@ -1007,6 +1008,7 @@ if sel is not None:
             if var_info:
                 var_name = var_info["name"]
                 st.session_state.var_values[var_name] = None
+                st.session_state[f"sb_val_{var_name}"] = "?"
                 for (ri, ci), info in st.session_state.user_vars.items():
                     if info["name"] == var_name:
                         cell_values[ri][ci] = None
