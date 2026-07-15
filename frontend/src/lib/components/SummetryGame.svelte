@@ -440,8 +440,17 @@
   async function restoreGameState() {
     const key = mode === 'daily' ? todayKey() : PRACTICE_STATE_KEY;
     const savedData = storage.get(key);
+    let loadedSession = null;
     if (savedData) {
-      session = JSON.parse(savedData);
+      try {
+        loadedSession = JSON.parse(savedData);
+      } catch (e) {
+        console.error("Failed to parse saved session:", e);
+      }
+    }
+
+    if (loadedSession) {
+      session = loadedSession;
       
       // Auto-migrate old saves to support variables on the fly:
       if (session && session.variables === undefined) {
@@ -610,8 +619,8 @@
     {#if session}
       <div class="puzzle-info">
         <div class="badge-row">
-          <span class="info-badge">ID: {session.boardId.slice(0, 8)}</span>
-          <span class="info-badge uppercase {session.difficulty.toLowerCase()}">{session.difficulty}</span>
+          <span class="info-badge">ID: {(session.boardId || '').slice(0, 8)}</span>
+          <span class="info-badge uppercase {(session.difficulty || 'Easy').toLowerCase()}">{session.difficulty || 'Easy'}</span>
           {#if session.solveTime > 0}
             <span class="info-badge timer">⏱️ {Math.floor(session.solveTime / 60)}:{(session.solveTime % 60) < 10 ? '0' : ''}{session.solveTime % 60}</span>
           {/if}
